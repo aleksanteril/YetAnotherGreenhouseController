@@ -15,6 +15,14 @@ uint32_t read_runtime_ctr(void) {
 }
 }
 
+// stack overflow check
+extern "C" {
+void vApplicationStackOverflowHook( TaskHandle_t xTask, char * pcTaskName ) {
+    if (pcTaskName != NULL) panic("Stack overflow: %s",pcTaskName);
+    else panic("Stack overflow of unnamed task");
+}
+}
+
 #include "blinker.h"
 
 SemaphoreHandle_t gpio_sem;
