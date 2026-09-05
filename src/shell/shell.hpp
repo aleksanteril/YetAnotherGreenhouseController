@@ -18,20 +18,14 @@ class Shell {
       private:
         void 
         print_usage();
-        bool 
-        read_cmd();
+        int 
+        read_chars();
         void 
         parse_value(std::string_view& cmd);
         void 
         parse_cmd();
-        static void
-        inactivity_timer(TimerHandle_t);
         
         PicoOsUart u{ PicoOsUart(0 , UART0_TX_PIN, UART0_RX_PIN, 115200) };
-        SemaphoreHandle_t semaph{ xSemaphoreCreateBinary() };
-        TimerHandle_t inactivity_tmr{ xTimerCreate("INACTIVITY TIMER", 
-                pdMS_TO_TICKS(30000), pdFALSE, (void*)semaph, inactivity_timer) };
-
         std::array<uint8_t, 64> buf;
         uint8_t* ptr{ buf.data() };
 };
