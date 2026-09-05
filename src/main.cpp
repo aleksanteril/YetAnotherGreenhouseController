@@ -1,18 +1,14 @@
 #include "FreeRTOS.h"
-#include "hardware/gpio.h"
 #include "pico/stdio.h"
-#include "pico/time.h"
-#include "hardware/sync.h"
 #include "task.h"
-#include "semphr.h"
-#include "metropolia_io.hpp"
-#include "PicoOsUart.h"
-#include "timers.h"
-#include <cstdio>
-#include <string.h>
 
 // this is needed for runtime statistics
 #include "rt_statistics.h"
+
+#include "shell/shell.hpp"
+
+void
+shell_task(void* param);
 
 int 
 main()
@@ -20,6 +16,19 @@ main()
         stdio_init_all();
         printf("\nBoot\n");
 
+        xTaskCreate(shell_task, "SHELL", 
+                512, NULL, tskIDLE_PRIORITY + 1, NULL);
+
         printf("Start FreeRTOS scheduler\n");
         vTaskStartScheduler();
+}
+
+void
+shell_task(void* param)
+{       
+        Shell sh;
+        printf("Start %s\n", __func__);
+        for(;;) {
+                sh.loop();
+        }
 }

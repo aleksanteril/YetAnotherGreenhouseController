@@ -8,6 +8,9 @@ add_executable(${ProjectName}
 
         utilities/rt_statistics.cpp
 
+        shell/shell.cpp
+        shell/shell.hpp
+
 #        ipstack/IPStack.cpp
 #        ipstack/IPStack.h
         ipstack/lwipopts.h
@@ -47,6 +50,7 @@ target_include_directories(${ProjectName} PRIVATE
         ipstack
         utilities
         lansk
+        shell
 )
 
 target_compile_definitions(${ProjectName} PRIVATE
