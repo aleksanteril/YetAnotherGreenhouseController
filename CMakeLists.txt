@@ -3,11 +3,11 @@ cmake_minimum_required(VERSION 3.12)
 # Set board type because we are building for PicoW
 set(PICO_BOARD pico_w)
 
-set(CMAKE_CXX_STANDARD 20)
-set(CMAKE_C_STANDARD 17)
+set(CMAKE_CXX_STANDARD 23)
+set(CMAKE_C_STANDARD 23)
 
 # Name project
-SET(ProjectName rp2040-freertos-irq)
+SET(ProjectName co2controller)
 
 # Set any variables required for importing libraries
 SET(FREERTOS_KERNEL_PATH ${CMAKE_CURRENT_SOURCE_DIR}/FreeRTOS-KernelV10.6.2)

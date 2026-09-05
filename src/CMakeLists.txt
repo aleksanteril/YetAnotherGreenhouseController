@@ -1,10 +1,12 @@
 add_executable(${ProjectName}
         main.cpp
-        critical_section.cpp
-        Fmutex.cpp
-        Fmutex.h
-        blinker.cpp
-        blinker.h
+        lansk/critical_section.cpp
+        lansk/Fmutex.cpp
+        lansk/Fmutex.h
+        lansk/blinker.cpp
+        lansk/blinker.h
+
+        utilities/rt_statistics.cpp
 
 #        ipstack/IPStack.cpp
 #        ipstack/IPStack.h
@@ -43,6 +45,8 @@ target_include_directories(${ProjectName} PRIVATE
         i2c
         display
         ipstack
+        utilities
+        lansk
 )
 
 target_compile_definitions(${ProjectName} PRIVATE
@@ -59,7 +63,6 @@ target_link_libraries(${ProjectName}
         pico_cyw43_arch_lwip_sys_freertos
         pico_lwip_mbedtls
         pico_mbedtls
-
 )
 
 # Ignore warnings from lwip code
