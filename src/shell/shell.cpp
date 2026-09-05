@@ -2,6 +2,12 @@
 #include <cstring>
 #include <charconv>
 
+static inline bool 
+stop(char c)
+{
+        return c == '\r'  || c == '\n';
+}
+
 void
 Shell::inactivity_timer(TimerHandle_t xTimer)
 {
@@ -25,17 +31,17 @@ Shell::loop()
         // Initial read, wake the task up
         ptr = buf.data();
         u.read(ptr, 1, portMAX_DELAY);
-        if(*ptr++ == END) {
+        if(stop(*ptr)) {
                 // Empty command line
                 return;
         }
-
+        u.write(ptr++, 1, 0);
         xTimerStart(inactivity_tmr, 0);
         // Read subsequent bytes, semaph from inactivity
         while (read_cmd() == false) {
                 if (xSemaphoreTake(semaph, 0)) {
                         // Inactivity flag
-                        constexpr const char* msg{ "[Inactive]\n" };
+                        constexpr const char* msg{ "\n[Inactive]\n" };
                         u.send(msg);
                         return;
                 }
@@ -60,20 +66,36 @@ Shell::print_usage()
 bool 
 Shell::read_cmd()
 {
-        const int size{ buf.end() - ptr };
-        int bytes{ u.read(ptr, size, pdMS_TO_TICKS(10)) };
+        int bytes{ u.read(ptr, 1, pdMS_TO_TICKS(10)) };
         if(bytes == 0) {
+                // Nothing written
                 return false;
         }
         xTimerReset(inactivity_tmr, 0);
-        ptr += bytes;
-        if(*(ptr-1) == END) {
+        
+        // Parse char
+        switch(*ptr) {
+        default:
+                if (ptr < buf.end()) {
+                        // Writing pointer in limits
+                        u.write(ptr++, 1, 0);
+                }
+                return false;
+        case '\x7f': // DEL
+        case '\b':
+                if (ptr-1 >= buf.data()) {
+                        // Clear, backspace - clear - backspace
+                        constexpr const char* clear{ "\b \b" };
+                        u.write((uint8_t*)clear, 3, 0);
+                        --ptr;
+                }
+                return false;
+        case '\r':
+        case '\n':
+                constexpr char nl{ '\n' };
+                u.write((uint8_t*)&nl, 1, 0);
                 return true;
-        } else if (ptr >= buf.end()) {
-                // Wrap around the buf
-                ptr = buf.data();
         }
-        return false;
 }
 
 void

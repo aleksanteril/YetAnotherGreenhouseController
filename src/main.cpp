@@ -27,7 +27,6 @@ void
 shell_task(void* param)
 {       
         Shell sh;
-        printf("Start %s\n", __func__);
         for(;;) {
                 sh.loop();
         }
