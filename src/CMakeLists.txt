@@ -7,6 +7,7 @@ add_executable(${ProjectName}
         lansk/blinker.h
 
         utilities/rt_statistics.cpp
+        utilities/crc16.cpp
 
         shell/shell.cpp
         shell/shell.hpp
@@ -20,6 +21,7 @@ add_executable(${ProjectName}
 
         i2c/PicoI2C.cpp
         i2c/PicoI2C.h
+        i2c/eeprom.hpp
 
         uart/PicoOsUart.cpp
         uart/PicoOsUart.h

@@ -2,13 +2,16 @@
 #include <cstring>
 #include <charconv>
 
+#define INACTIVE -1
+
 static inline bool 
 stop(char c)
 {
         return c == '\r'  || c == '\n';
 }
 
-Shell::Shell()
+Shell::Shell(EEPROM* e)
+: e(e)
 {
 }
 
@@ -26,9 +29,7 @@ Shell::loop()
 
         // Read subsequent bytes
         for(int res; res = read_chars();) {
-                if(res < 0 ) {
-                        constexpr const char* msg{ "\n[Inactive]\n" };
-                        u.send(msg);
+                if(res ==  INACTIVE) {
                         return;
                 }
         }
@@ -53,7 +54,9 @@ Shell::read_chars()
         int bytes{ u.read(ptr, 1, pdMS_TO_TICKS(30000)) };
         if(bytes == 0) {
                 // Inactive >30s
-                return -1;
+                constexpr const char* msg{ "\n[Inactive]\n" };
+                u.send(msg);
+                return INACTIVE;
         }
 
         // Parse char
