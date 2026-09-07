@@ -79,6 +79,11 @@ Shell::read_chars()
                 return 1;
         case '\r':
         case '\n':
+                {
+                        // Incase of \r\n read the subsequent LF
+                        char dummy{};
+                        u.read((uint8_t*)&dummy, 1, pdMS_TO_TICKS(5));
+                }
                 constexpr const char* end{ "\r\n" };
                 u.write((uint8_t*)end, 2, 0);
                 return 0;
@@ -94,10 +99,7 @@ void
 Shell::parse_cmd()
 {
         //Sanitize command
-        std::string_view cmd{ (char*)buf.data() };
-        auto pos{ cmd.find_first_of("\r\n") };
-        cmd = cmd.substr(0, pos);
-
+        std::string_view cmd{ (char*)buf.data(), ptr - buf.data() };
         //Parse command
         if(cmd == "help") {
                 print_usage();
