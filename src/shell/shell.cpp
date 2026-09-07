@@ -40,11 +40,11 @@ Shell::loop()
 void
 Shell::print_usage()
 {
-        constexpr const char* msg{ "Usage: [help || time || interval <time>]\n"
-                "Options:\n"
-                "       help:   - print this help\n"
-                "       time:   - print last timestamp of toggle\n"
-                "   interval:   - change led interval to specified time\n" };
+        constexpr const char* msg{ "Usage: [help || time || interval <time>]\r\n"
+                "Options:\r\n"
+                "       help:   - print this help\r\n"
+                "       time:   - print last timestamp of toggle\r\n"
+                "   interval:   - change led interval to specified time\r\n" };
         u.send(msg);
 }
 
@@ -54,7 +54,7 @@ Shell::read_chars()
         int bytes{ u.read(ptr, 1, pdMS_TO_TICKS(30000)) };
         if(bytes == 0) {
                 // Inactive >30s
-                constexpr const char* msg{ "\n[Inactive]\n" };
+                constexpr const char* msg{ "\r\n[Inactive]\r\n" };
                 u.send(msg);
                 return INACTIVE;
         }
@@ -79,8 +79,8 @@ Shell::read_chars()
                 return 1;
         case '\r':
         case '\n':
-                constexpr char nl{ '\n' };
-                u.write((uint8_t*)&nl, 1, 0);
+                constexpr const char* end{ "\r\n" };
+                u.write((uint8_t*)end, 2, 0);
                 return 0;
         }
 }
@@ -102,7 +102,7 @@ Shell::parse_cmd()
         if(cmd == "help") {
                 print_usage();
         } else {
-                constexpr const char* msg{ "Unknown command, try help\n" };
+                constexpr const char* msg{ "Unknown command, try help\r\n" };
                 u.send(msg);
         }
 }
