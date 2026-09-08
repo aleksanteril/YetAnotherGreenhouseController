@@ -45,6 +45,8 @@ add_executable(${ProjectName}
 #        display/ssd1306.h
         display/ssd1306os.h
         display/ssd1306os.cpp
+        display/ui_display.hpp
+        display/ui_display.cpp
 )
 
 target_include_directories(${ProjectName} PRIVATE

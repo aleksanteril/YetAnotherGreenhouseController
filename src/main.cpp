@@ -6,6 +6,7 @@
 #include "rt_statistics.h"
 
 #include "shell.hpp"
+#include "ui_display.hpp"
 
 void
 shell_task(void* param);
@@ -33,9 +34,10 @@ main()
 void
 ui_task(void* param)
 {
-        auto e{ (EEPROM*) param };
+        
+        UI_Display ui((EEPROM*)param);
         for(;;) {
-                vTaskDelay(pdMS_TO_TICKS(1000));
+                ui.loop();
         }
 }
 
