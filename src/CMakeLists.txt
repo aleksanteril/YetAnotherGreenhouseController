@@ -7,7 +7,11 @@ add_executable(${ProjectName}
         lansk/blinker.h
 
         utilities/rt_statistics.cpp
+        utilities/rt_statistics.h
         utilities/crc16.cpp
+        utilities/crc16.h
+        utilities/intnet.h
+        utilities/intnet.cpp
 
         shell/shell.cpp
         shell/shell.hpp

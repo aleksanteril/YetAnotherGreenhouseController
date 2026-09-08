@@ -18,10 +18,10 @@ class Shell {
       private:
         void 
         print_usage();
+        void
+        print_settings();
         int 
         read_chars();
-        void 
-        parse_value(std::string_view& cmd);
         void 
         parse_cmd();
         
