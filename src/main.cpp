@@ -23,7 +23,7 @@ main()
         static EEPROM e;
 
         xTaskCreate(shell_task, "SHELL", 
-                512, (void*)&e, tskIDLE_PRIORITY + 1, NULL);
+                312, (void*)&e, tskIDLE_PRIORITY + 1, NULL);
         xTaskCreate(ui_task, "UI", 
                 512, (void*)&e, tskIDLE_PRIORITY + 1, NULL);
 
