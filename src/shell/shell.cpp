@@ -57,11 +57,9 @@ Shell::loop()
         // Initial read, wake the task up
         ptr = buf.data();
         u.read(ptr, 1, portMAX_DELAY);
-        if(stop(*ptr)) {
-                // Empty command line
-                return;
+        if(!stop(*ptr)) {
+                u.write(ptr++, 1, 0);
         }
-        u.write(ptr++, 1, 0);
 
         // Read subsequent bytes
         for(int res; res = read_chars();) {
