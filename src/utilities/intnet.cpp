@@ -19,3 +19,17 @@ dec_to_inet(uint8_t a, uint8_t b, uint8_t c, uint8_t d)
                   (uint32_t) d;
         return ipaddr;
 }
+
+bool
+valid_ip(uint32_t ipaddr)
+{
+        uint8_t first_octet{ (uint8_t)(ipaddr >> 24U) };
+        if (first_octet == 0) {
+                return false;
+        } else if(first_octet == 127) {
+                return false;
+        } else if(first_octet > 223) {
+                return false;
+        }
+        return true;
+}

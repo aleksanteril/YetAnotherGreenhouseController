@@ -21,7 +21,7 @@ class Shell {
         void
         print_settings();
         int 
-        read_chars();
+        read_chars(bool&);
         void 
         parse_cmd();
         
