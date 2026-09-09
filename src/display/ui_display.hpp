@@ -9,7 +9,7 @@
 #include "timers.h"
 #include <array>
 
-enum Event { LEFT, RIGHT, PRESS, INACTIVE, UPDATE };
+enum Event { LEFT, RIGHT, INACTIVE, UPDATE, PRESS_SW0 = SW0_PIN, PRESS_SW2 = SW2_PIN };
 extern QueueHandle_t DisplayEvent_q;
 
 // We are the sole device on I2C1, this project doesn't use the pressure sensor
@@ -26,7 +26,7 @@ class UI_Display {
         void
         change_state_to(State);
 
-        // States and their variables
+        // States and their variables and helper funcs
         void
         status(enum intEvent);
 
@@ -35,6 +35,13 @@ class UI_Display {
         void
         info(enum intEvent);
 
+        void
+        wait(enum intEvent);
+
+        void
+        handle_draw_val();
+        std::array<int, 4> set_val{};
+        int res{};
         void
         set_ipv4(enum intEvent);
         void
@@ -48,7 +55,7 @@ class UI_Display {
         
         // Starting state
         Event ev;
-        State state{ &UI_Display::status };
+        State state{ &UI_Display::menu };
 
         std::shared_ptr<PicoI2C> i2cbus{std::make_shared<PicoI2C>(1, 400000)};
         ssd1306os display{i2cbus};
