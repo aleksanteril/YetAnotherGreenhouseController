@@ -18,19 +18,18 @@ parse_ip(std::string_view& cmd)
                 octets, octets+1, octets+2, octets+3) != 4) {
                 return 0;
         }
-        int sum{};
         for(auto octet : octets) {
                 if(octet > 255) {
                         // invalid
                         return 0;
                 }
-                sum += octet;
         }
-        if(sum <= 0) {
-                // invalid ipv4 addr 0.0.0.0 example
+        uint32_t ipaddr{ 
+                dec_to_inet(octets[0], octets[1], octets[2], octets[3]) };
+        if(!valid_ip(ipaddr)) {
                 return 0;
         }
-        return dec_to_inet(octets[0], octets[1], octets[2], octets[3]);
+        return ipaddr;
 }
 
 static inline int
@@ -57,12 +56,10 @@ Shell::loop()
         // Initial read, wake the task up
         ptr = buf.data();
         u.read(ptr, 1, portMAX_DELAY);
-        if(!stop(*ptr)) {
-                u.write(ptr++, 1, 0);
-        }
+        bool first_ch{ true };
 
         // Read subsequent bytes
-        for(int res; res = read_chars();) {
+        for(int res; res = read_chars(first_ch);) {
                 if(res ==  INACTIVE) {
                         return;
                 }
@@ -107,19 +104,29 @@ Shell::print_settings()
 }
 
 int
-Shell::read_chars()
+Shell::read_chars(bool& skip_read)
 {
-        int bytes{ u.read(ptr, 1, pdMS_TO_TICKS(30000)) };
-        if(bytes == 0) {
-                // Inactive >30s
-                constexpr const char* msg{ "\r\n[Inactive]\r\n" };
-                u.send(msg);
-                return INACTIVE;
+        if(!skip_read) {
+                int bytes{ u.read(ptr, 1, pdMS_TO_TICKS(30000)) };
+                if(bytes == 0) {
+                        // Inactive >30s
+                        constexpr const char* msg{ "\r\n[Inactive]\r\n" };
+                        u.send(msg);
+                        return INACTIVE;
+                }
+        } else {
+                skip_read = false;
         }
 
         // Parse char
         switch(*ptr) {
         default:
+                if(*ptr < 32 || *ptr > 127) {
+                        // destroy potential ansi sequences other garbage etc
+                        uint8_t dummy;
+                        while(u.read(&dummy, 1, 0));
+                        return 1;
+                }
                 if (ptr < buf.end()-1) {
                         // Writing pointer in limits end() - 1
                         // The last place in buffer is dummy char for read()

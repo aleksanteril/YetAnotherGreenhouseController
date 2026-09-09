@@ -5,6 +5,7 @@
 #include <string>
 #include <span>
 #include <string>
+#include "intnet.h"
 
 QueueHandle_t DisplayEvent_q{ nullptr };
 
@@ -169,18 +170,17 @@ handle_draw_dots(ssd1306os& display)
 static int
 save_valid_ipaddr(EEPROM* e, std::span<int> octets)
 {
-        int sum{};
         for(auto octet : octets) {
                 if(octet > 255) {
                         return -1;
                 }
-                sum += octet;
         }
-        if(sum == 0) {
+        uint32_t ipaddr{ dec_to_inet(
+                octets[0], octets[1], octets[2], octets[3]) };
+        if(!valid_ip(ipaddr)) {
                 return -1;
         }
-        return e->save_ipaddr(dec_to_inet(
-                octets[0], octets[1], octets[2], octets[3]));
+        return e->save_ipaddr(ipaddr);
 }
 
 static int
