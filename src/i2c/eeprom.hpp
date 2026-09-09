@@ -5,11 +5,13 @@
 #include "PicoI2C.h"
 #include <cstring>
 #include "intnet.h"
-#include <mutex>
+#include "event_groups.h"
 
 // Memory alignment, SETPOINT 2b CRC16 2b ; IPADDR 4b CRC16 2b
 #define SETPOINT_ADDR 0x0
 #define IPADDR_ADDR SETPOINT_ADDR+4
+
+constexpr int GO_BITS{ 0x1 };
 
 /* EEPROM 0x50 is the only device used on i2c0 */
 class EEPROM : private PicoI2C {
@@ -17,6 +19,7 @@ class EEPROM : private PicoI2C {
                 EEPROM(uint8_t addr=0x50, uint bus_nr=0)
                 : PicoI2C(bus_nr, 400000), dev_addr(addr)
                 {
+                        xEventGroupSetBits(go, GO_BITS);
                 }
                 EEPROM(const EEPROM&) = delete;
 
@@ -74,7 +77,7 @@ class EEPROM : private PicoI2C {
 
         private:
                 const uint8_t dev_addr;
-                Fmutex mtx;
+                EventGroupHandle_t go{ xEventGroupCreate() };
 
                 // True on success
                 bool 
@@ -83,8 +86,11 @@ class EEPROM : private PicoI2C {
                         uint8_t frame[2];
                         frame[0] = (uint8_t)(addr >> 8U);
                         frame[1] = (uint8_t)addr;
-                        std::lock_guard<Fmutex> lock(mtx);
-                        return transaction(dev_addr, frame, 2, bytes, len) == len+2;
+                        // go read if no-one is writing or after 10ms write
+                        xEventGroupWaitBits(go, GO_BITS, 
+                                pdFALSE, pdTRUE, portMAX_DELAY);
+                        return transaction(dev_addr, 
+                                frame, 2, bytes, len) == len+2;
                 }
 
                 // NOTE! len must be 64 or under due to EEPROM page size!
@@ -99,14 +105,16 @@ class EEPROM : private PicoI2C {
                         frame[0] = (uint8_t)(addr >> 8U);
                         frame[1] = (uint8_t)addr;
                         memcpy(frame+2, bytes, len);
-                        std::lock_guard<Fmutex> lock(mtx);
-                        if (write(dev_addr, frame, len+2) == len+2) {
-                                // hack for data coherency, 
-                                // force everyone on mutex to wait
-                                vTaskDelay(pdMS_TO_TICKS(10));
-                                return true;                                                                
+                        // go write, clear go bit
+                        xEventGroupWaitBits(go, GO_BITS, pdTRUE, pdTRUE, portMAX_DELAY);
+                        bool result{ write(dev_addr, frame, len+2) == len+2 };
+                        if (result) {
+                                // data coherency force tasks on event flag to wait
+                                vTaskDelay(pdMS_TO_TICKS(10));                                                                
                         }
-                        return false;
+                        // set go bit ok again
+                        xEventGroupSetBits(go, GO_BITS);
+                        return result;
                 }
 };
 
