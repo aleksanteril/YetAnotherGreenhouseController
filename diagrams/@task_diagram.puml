@@ -1,0 +1,6 @@
+@startuml greenhouse_co2_controller
+title Greenhouse CO2 Controller - FreeRTOS Architecture
+
+
+
+@enduml
