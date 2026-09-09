@@ -3,16 +3,6 @@
 
 #include "pico/types.h"
 
-/*
-#define SW0_PIN 9
-#define SW1_PIN 8
-#define SW2_PIN 7
-
-#define LED1_PIN 20
-#define LED2_PIN 21
-#define LED3_PIN 22
-*/
-
 constexpr uint SW0_PIN{ 9 };
 constexpr uint SW1_PIN{ 8 };
 constexpr uint SW2_PIN{ 7 };

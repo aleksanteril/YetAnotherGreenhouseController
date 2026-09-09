@@ -7,6 +7,14 @@ add_executable(${ProjectName}
         lansk/blinker.h
 
         utilities/rt_statistics.cpp
+        utilities/rt_statistics.h
+        utilities/crc16.cpp
+        utilities/crc16.h
+        utilities/intnet.h
+        utilities/intnet.cpp
+
+        shell/shell.cpp
+        shell/shell.hpp
 
 #        ipstack/IPStack.cpp
 #        ipstack/IPStack.h
@@ -17,6 +25,7 @@ add_executable(${ProjectName}
 
         i2c/PicoI2C.cpp
         i2c/PicoI2C.h
+        i2c/eeprom.hpp
 
         uart/PicoOsUart.cpp
         uart/PicoOsUart.h
@@ -36,6 +45,8 @@ add_executable(${ProjectName}
 #        display/ssd1306.h
         display/ssd1306os.h
         display/ssd1306os.cpp
+        display/ui_display.hpp
+        display/ui_display.cpp
 )
 
 target_include_directories(${ProjectName} PRIVATE
@@ -47,6 +58,7 @@ target_include_directories(${ProjectName} PRIVATE
         ipstack
         utilities
         lansk
+        shell
 )
 
 target_compile_definitions(${ProjectName} PRIVATE
