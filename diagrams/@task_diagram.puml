@@ -1,6 +1,53 @@
-@startuml greenhouse_co2_controller
-title Greenhouse CO2 Controller - FreeRTOS Architecture
+@startuml
+!theme reddress-lightgreen
+title Greenhouse CO2 Controller - Task Diagram
 
+left to right direction
 
+component "EEPROM Gatekeeper Task" as EEPROM
+component "Network Task" as NET
+component "Sensor / I/O Task" as IO
+component "Button Task" as BUTTON
+component "UI Task" as UI
+component "CO2 Controller Task" as CTRL
+
+note left of EEPROM
+- Sole access to EEPROM
+- Load persistent settings
+- Save changed settings
+end note
+
+note left of NET
+- Wi-Fi connection
+- ThingSpeak communication
+- Remote commands
+end note
+
+note left of IO
+- Read CO2 sensor
+- Read temperature
+- Read humidity
+- Read fan feedback
+end note
+
+note left of BUTTON
+- Read rotary push button
+- Detect button press
+- Send PRESS event to UI
+end note
+
+note left of UI
+- Handle local user interface
+- Handle menus
+- Update OLED
+- Change CO2 setpoint
+end note
+
+note left of CTRL
+- Maintain CO2 setpoint
+- Control CO2 valve
+- Control ventilation
+- Handle safety limit
+end note
 
 @enduml
