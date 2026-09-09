@@ -4,17 +4,17 @@ title Greenhouse CO2 Controller - Task Diagram
 
 left to right direction
 
-component "EEPROM Gatekeeper Task" as EEPROM
+component "Shell Task" as SHELL
 component "Network Task" as NET
 component "Sensor / I/O Task" as IO
-component "Button Task" as BUTTON
+component "Button Tasks" as BUTTON
 component "UI Task" as UI
 component "CO2 Controller Task" as CTRL
 
-note left of EEPROM
-- Sole access to EEPROM
-- Load persistent settings
-- Save changed settings
+note left of SHELL
+- UART command interface
+- Read and change settings
+- Quick system configuration
 end note
 
 note left of NET
@@ -31,9 +31,9 @@ note left of IO
 end note
 
 note left of BUTTON
-- Read rotary push button
-- Detect button press
-- Send PRESS event to UI
+- Read push buttons
+- Detect button presses
+- Send button events to UI
 end note
 
 note left of UI
