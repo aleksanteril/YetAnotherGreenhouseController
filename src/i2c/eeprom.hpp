@@ -5,6 +5,7 @@
 #include "PicoI2C.h"
 #include <cstring>
 #include "intnet.h"
+#include <mutex>
 
 // Memory alignment, SETPOINT 2b CRC16 2b ; IPADDR 4b CRC16 2b
 #define SETPOINT_ADDR 0x0
@@ -73,6 +74,7 @@ class EEPROM : private PicoI2C {
 
         private:
                 const uint8_t dev_addr;
+                Fmutex mtx;
 
                 // True on success
                 bool 
@@ -81,6 +83,7 @@ class EEPROM : private PicoI2C {
                         uint8_t frame[2];
                         frame[0] = (uint8_t)(addr >> 8U);
                         frame[1] = (uint8_t)addr;
+                        std::lock_guard<Fmutex> lock(mtx);
                         return transaction(dev_addr, frame, 2, bytes, len) == len+2;
                 }
 
@@ -96,7 +99,14 @@ class EEPROM : private PicoI2C {
                         frame[0] = (uint8_t)(addr >> 8U);
                         frame[1] = (uint8_t)addr;
                         memcpy(frame+2, bytes, len);
-                        return write(dev_addr, frame, len+2) == len+2;
+                        std::lock_guard<Fmutex> lock(mtx);
+                        if (write(dev_addr, frame, len+2) == len+2) {
+                                // hack for data coherency, 
+                                // force everyone on mutex to wait
+                                vTaskDelay(pdMS_TO_TICKS(10));
+                                return true;                                                                
+                        }
+                        return false;
                 }
 };
 

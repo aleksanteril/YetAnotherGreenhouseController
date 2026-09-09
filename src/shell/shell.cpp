@@ -88,22 +88,13 @@ Shell::print_settings()
 {
         uint32_t ipaddr{};
         uint16_t setpoint{};
-        bool set_r{}, ip_r{};
-        for(int i{}; !(set_r || ip_r); ++i) {
-                if(ip_r == false) {
-                        ip_r = e->load_ipaddr(&ipaddr);
-                }
-                vTaskDelay(pdMS_TO_TICKS(15));
-                if(set_r == false) {
-                        set_r = e->load_setpoint(&setpoint);
-                }
-                if(i > 5) {
-                        constexpr const char* fail{ 
-                                "Failed to load settings\r\n" };
-                        u.send(fail);
-                        return;
-                }
-                vTaskDelay(pdMS_TO_TICKS(10));
+        bool ip_r{ e->load_ipaddr(&ipaddr) };
+        bool set_r{ e->load_setpoint(&setpoint) };
+        if(!ip_r || !set_r) {
+                constexpr const char* fail{ 
+                        "Failed to load settings\r\n" };
+                u.send(fail);
+                return;
         }
         // Convert IPv4 to decimal notation
         uint8_t a, b, c, d;
