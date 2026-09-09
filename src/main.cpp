@@ -37,6 +37,7 @@ ui_task(void* param)
         
         UI_Display ui((EEPROM*)param);
         for(;;) {
+                // Display sleeps unless events come on queue
                 ui.loop();
         }
 }

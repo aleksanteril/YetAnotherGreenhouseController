@@ -7,8 +7,10 @@
 #include "ssd1306os.h"
 #include "eeprom.hpp"
 #include "timers.h"
+#include <array>
 
-enum Event { NONE, LEFT, RIGHT, PRESS, INACTIVE };
+enum Event { LEFT, RIGHT, PRESS, INACTIVE, UPDATE };
+extern QueueHandle_t DisplayEvent_q;
 
 // We are the sole device on I2C1, this project doesn't use the pressure sensor
 class UI_Display {
@@ -17,20 +19,47 @@ class UI_Display {
         UI_Display(const UI_Display&) = delete;
         void
         loop();
+
       private:
-        enum State { STATUS, MENU };
-        State state{ STATUS };
+        enum intEvent { Enter, Exit, Loop };
+        using State = void(UI_Display::*)(enum intEvent);
+        void
+        change_state_to(State);
+
+        // States and their variables
+        void
+        status(enum intEvent);
+
+        std::array<char, 16> info_setp;
+        std::array<char, 24> info_ipv4;
+        void
+        info(enum intEvent);
+
+        void
+        set_ipv4(enum intEvent);
+        void
+        set_target(enum intEvent);
+        
+        int menu_i{};
+        std::array<State, 3> items{ &UI_Display::info, 
+                &UI_Display::set_target, &UI_Display::set_ipv4 };
+        void
+        menu(enum intEvent);
+        
+        // Starting state
+        Event ev;
+        State state{ &UI_Display::status };
 
         std::shared_ptr<PicoI2C> i2cbus{std::make_shared<PicoI2C>(1, 400000)};
         ssd1306os display{i2cbus};
-        QueueHandle_t event_q{ xQueueCreate(10, sizeof(Event)) };
+        QueueHandle_t event_q{ xQueueCreate(15, sizeof(Event)) };
 
         static void
         inactivity_timer(TimerHandle_t xTimer);
-        TimerHandle_t inact_t{ xTimerCreate("INACT_TMR", pdMS_TO_TICKS(10000), 
-                pdFALSE, (void*)&event_q, inactivity_timer) };
+        TimerHandle_t inact_t{ xTimerCreate("INACT_TMR", pdMS_TO_TICKS(20000), 
+                pdFALSE, nullptr, inactivity_timer) };
 
-        EEPROM* e;
+        EEPROM* eeprom;
 };
 
 #endif
