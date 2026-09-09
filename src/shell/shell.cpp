@@ -45,7 +45,7 @@ parse_setpoint(std::string_view& cmd)
         return setpoint;
 }
 
-Shell::Shell(EEPROM* e)
+Shell::Shell(EEPROM& e)
 : e(e)
 {
 }
@@ -85,8 +85,8 @@ Shell::print_settings()
 {
         uint32_t ipaddr{};
         uint16_t setpoint{};
-        bool ip_r{ e->load_ipaddr(&ipaddr) };
-        bool set_r{ e->load_setpoint(&setpoint) };
+        bool ip_r{ e.load_ipaddr(ipaddr) };
+        bool set_r{ e.load_setpoint(setpoint) };
         if(!ip_r || !set_r) {
                 constexpr const char* fail{ 
                         "Failed to load settings\r\n" };
@@ -183,7 +183,7 @@ Shell::parse_cmd()
                         u.send(fail_parse);
                         return;
                 }
-                if (e->save_ipaddr(ipaddr) == false) {
+                if (e.save_ipaddr(ipaddr) == false) {
                         u.send(fail_save);
                 }
         } else if (cmd.starts_with("set target ")) {
@@ -193,7 +193,7 @@ Shell::parse_cmd()
                         u.send(fail_parse);
                         return;
                 }
-                if (e->save_setpoint(setpoint) == false) {
+                if (e.save_setpoint(setpoint) == false) {
                         u.send(fail_save);
                 }
         } else {

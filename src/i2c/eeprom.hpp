@@ -37,7 +37,7 @@ class EEPROM : private PicoI2C {
                 }
 
                 bool
-                load_setpoint(uint16_t* setpoint)
+                load_setpoint(uint16_t& setpoint)
                 {
                         uint8_t buf[4];
                         if (read_page(SETPOINT_ADDR, buf, 4) == false) {
@@ -46,7 +46,7 @@ class EEPROM : private PicoI2C {
                         if (crc16(buf, 4) != 0) {
                                 return false;
                         }
-                        *setpoint = ((uint16_t)buf[0] << 8U) | buf[1];
+                        setpoint = ((uint16_t)buf[0] << 8U) | buf[1];
                         return true;
                 }
 
@@ -62,7 +62,7 @@ class EEPROM : private PicoI2C {
                 }
 
                 bool
-                load_ipaddr(uint32_t* ipaddr)
+                load_ipaddr(uint32_t& ipaddr)
                 {
                         uint8_t buf[6];
                         if (read_page(IPADDR_ADDR, buf, 6) == false) {
@@ -71,7 +71,7 @@ class EEPROM : private PicoI2C {
                         if (crc16(buf, 6) != 0) {
                                 return false;
                         }
-                        *ipaddr = dec_to_inet(buf[0], buf[1], buf[2], buf[3]);
+                        ipaddr = dec_to_inet(buf[0], buf[1], buf[2], buf[3]);
                         return true;
                 }
 

@@ -15,7 +15,7 @@ extern QueueHandle_t DisplayEvent_q;
 // We are the sole device on I2C1, this project doesn't use the pressure sensor
 class UI_Display {
       public:
-        UI_Display(EEPROM* e);
+        UI_Display(EEPROM& e);
         UI_Display(const UI_Display&) = delete;
         void
         loop();
@@ -66,7 +66,7 @@ class UI_Display {
         TimerHandle_t inact_t{ xTimerCreate("INACT_TMR", pdMS_TO_TICKS(20000), 
                 pdFALSE, nullptr, inactivity_timer) };
 
-        EEPROM* eeprom;
+        EEPROM& eeprom;
 };
 
 #endif

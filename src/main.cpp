@@ -35,7 +35,7 @@ void
 ui_task(void* param)
 {
         
-        UI_Display ui((EEPROM*)param);
+        UI_Display ui(*(EEPROM*)param);
         for(;;) {
                 // Display sleeps unless events come on queue
                 ui.loop();
@@ -45,7 +45,7 @@ ui_task(void* param)
 void
 shell_task(void* param)
 {       
-        Shell sh((EEPROM*)param);
+        Shell sh(*(EEPROM*)param);
         for(;;) {
                 // Task sleeps until activity starts on UART0
                 sh.loop();

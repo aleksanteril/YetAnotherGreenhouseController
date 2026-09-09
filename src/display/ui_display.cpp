@@ -38,7 +38,7 @@ callback_irq(uint gpio, uint32_t event_mask)
 }
 
 
-UI_Display::UI_Display(EEPROM* e)
+UI_Display::UI_Display(EEPROM& e)
   : eeprom(e)
 {
         gpio_init(ROT_A_PIN);
@@ -72,12 +72,12 @@ UI_Display::change_state_to(State st)
 
 // Helper function for info state
 static int
-read_info_eeprom(EEPROM* e, std::span<char> ipv4, std::span<char> setp)
+read_info_eeprom(EEPROM& e, std::span<char> ipv4, std::span<char> setp)
 {
         uint32_t ipaddr{};
         uint16_t setpoint{};
-        bool ip_r{ e->load_ipaddr(&ipaddr) };
-        bool set_r{ e->load_setpoint(&setpoint) };
+        bool ip_r{ e.load_ipaddr(ipaddr) };
+        bool set_r{ e.load_setpoint(setpoint) };
         if(!ip_r || !set_r) {
                 return -1;
         }
@@ -168,7 +168,7 @@ handle_draw_dots(ssd1306os& display)
 }
 
 static int
-save_valid_ipaddr(EEPROM* e, std::span<int> octets)
+save_valid_ipaddr(EEPROM& e, std::span<int> octets)
 {
         for(auto octet : octets) {
                 if(octet > 255) {
@@ -180,11 +180,11 @@ save_valid_ipaddr(EEPROM* e, std::span<int> octets)
         if(!valid_ip(ipaddr)) {
                 return -1;
         }
-        return e->save_ipaddr(ipaddr);
+        return e.save_ipaddr(ipaddr);
 }
 
 static int
-save_valid_setpoint(EEPROM* e, std::span<int> vals)
+save_valid_setpoint(EEPROM& e, std::span<int> vals)
 {
         //fast way to write but uses std::string heap etc
         std::string temp;
@@ -195,7 +195,7 @@ save_valid_setpoint(EEPROM* e, std::span<int> vals)
         if(setpoint < 0 || setpoint > 1500) {
                 return -1;
         }
-        return e->save_setpoint(setpoint);
+        return e.save_setpoint(setpoint);
 }
 
 void
