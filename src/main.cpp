@@ -43,11 +43,13 @@ main()
 }
 
 constexpr int SETPOINT{ 1500 };
-constexpr double kp{ 0.075 };
+constexpr double kp{ 0.15 };
 
 constexpr uint UART1_BAUD{ 9600 };
 constexpr uint UART1_TX_PIN{ 4 };
 constexpr uint UART1_RX_PIN{ 5 };
+
+#include "hardware/gpio.h"
 
 void
 sensor_task(void* param)
@@ -59,14 +61,22 @@ sensor_task(void* param)
         HMP60 hmp(rtu);
         PRODUAL fan(rtu);
         CO2_Valve valve;
-        fan.write_speed(800);
+        //P_Controller pid_valve(valve, SETPOINT, 0.15);
+        P_Controller pid_fan(fan, 2000, 2, false);
+        gpio_init(SW1_PIN);
+        gpio_set_dir(SW1_PIN, GPIO_IN);
+        gpio_pull_up(SW1_PIN);
+        //fan.write_speed(800);
         // make a PI controller for co2 setpoint and valve and fan control
         for(;;) {
-                int error = SETPOINT - co2.read();
-                int p = std::round(kp*error);
-                int output = p;
-                valve.set_cycle(output);
-                printf("out: %d\n", output);
+                if(!gpio_get(SW1_PIN)) {
+                        valve.open();
+                } else {
+                        valve.close();
+                }
+                uint16_t pv{ co2.read() };
+                //pid_valve.loop(pv);
+                pid_fan.loop(pv);
                 vTaskDelay(pdMS_TO_TICKS(2000));
         }
 }

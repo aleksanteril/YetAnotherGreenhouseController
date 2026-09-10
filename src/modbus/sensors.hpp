@@ -4,6 +4,7 @@
 #include "FreeRTOS.h"
 #include "ModbusRegister.h"
 #include "timers.h"
+#include <cmath>
 
 struct SensorVal_t {
         TickType_t timestamp;
@@ -47,6 +48,8 @@ class PRODUAL {
         // 0 - 1000
         void
         write_speed(uint16_t val);
+        void
+        set_output(int percent);
 
       private:
         ModbusRegister wd;
@@ -64,7 +67,7 @@ class CO2_Valve {
         close();
         // set 0% - 100%
         void
-        set_cycle(int percent);
+        set_output(int percent);
 
       private:
         const uint pin;
@@ -76,6 +79,33 @@ class CO2_Valve {
         // Opens the valve and sets a ISR timer 1s to shut it
         static void
         valve_timer(TimerHandle_t xTimer);
+};
+
+
+// P-controller (PI potential)
+template <typename Device>
+class P_Controller {
+      public:
+        // dir, true(default) = direct action, false = reverse action
+        P_Controller(Device& d, int sp, double kp, bool dir=true)
+        : d(d), sp(sp), dir(dir) 
+        {
+                // dir, true(default) = direct action, false = reverse action
+                this->kp = dir ? kp : (kp*-1);
+        }
+        void
+        loop(int pv)
+        {
+                int error{ sp - pv };
+                int output{ (int)std::round(kp*error) };
+                d.set_output(output);
+        }
+        int sp;
+
+      private:
+        Device& d;
+        double kp;
+        bool dir;
 };
 
 #endif

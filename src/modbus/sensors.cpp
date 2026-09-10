@@ -7,7 +7,6 @@ constexpr uint HMP60_ADDR{ 241 };
 HMP60::HMP60(std::shared_ptr<ModbusClient> client_)
 : rh(client_, HMP60_ADDR, 256), temp(client_, HMP60_ADDR, 257) 
 {
-
 }
 
 double
@@ -29,12 +28,12 @@ GMP252::GMP252(std::shared_ptr<ModbusClient> client_)
 
 }
 
+
 // fan control
 constexpr uint PRODUAL_ADDR{ 1 };
 PRODUAL::PRODUAL(std::shared_ptr<ModbusClient> client_)
 : wd(client_, PRODUAL_ADDR, 0, false), speed(client_, PRODUAL_ADDR, 0) 
 {
-
 }
 
 int
@@ -54,6 +53,20 @@ void
 PRODUAL::write_speed(uint16_t val) 
 { 
         speed.write(val > 1000 ? 1000 : val);
+}
+
+void
+PRODUAL::set_output(int percent)
+{
+        if(percent < 0) {
+                percent = 0;
+        } else if(percent < 20) {
+                // minimum speed to turn the fan
+                percent = 20;
+        } else if(percent > 100) {
+                percent = 100;
+        }
+        write_speed(percent*10);
 }
 
 
@@ -94,14 +107,17 @@ CO2_Valve::close()
 
 // set 0% - 100%
 void
-CO2_Valve::set_cycle(int percent)
+CO2_Valve::set_output(int percent)
 {
-        if(percent >= 100 || percent <= 0) {
+        if(percent <= 0) {
                 xTimerStop(tmr, 0);
-                percent > 100 ? open() : close();
-        
+                close();
+                return;
+        } else if(percent > 100) {
+                percent = 100;
         }
-        open_ms = percent*300;
+        // allow max 10s of valve continuously open
+        open_ms = percent*100;
         if(xTimerIsTimerActive(tmr) == pdFALSE) {
                 xTimerStart(tmr, 0);
         }
