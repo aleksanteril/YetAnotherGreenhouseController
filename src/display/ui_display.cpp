@@ -205,7 +205,6 @@ UI_Display::set_target(enum intEvent _e)
                                 display.text("Save failed!", 0, 0, 1);
                                 display.show();
                                 change_state_to(&UI_Display::wait);
-                                break;
                         } else {
                                 //save ok
                                 change_state_to(&UI_Display::menu);
