@@ -90,7 +90,7 @@ UI_Display::info(enum intEvent _e)
         case Enter:
                 display.fill(0);
                 if (read_info_eeprom(eeprom, info_setp)) {
-                        display.text("CO2 Target", 24, 0, 1);
+                        display.text("CO2 TARGET", 24, 0, 1);
                         display.text(info_setp.data(), 16, 10, 1);
                 } else {
                         display.text("Failed to load!", 0, 0, 1);
@@ -141,13 +141,14 @@ handle_var(Event ev, int& val, int min, int max)
 
 // helper function for similar ipv4 and setpoint setting
 void
-handle_draw_val(ssd1306os& display, std::span<int> set_val)
+handle_draw_val(ssd1306os& display, std::span<int> set_val, int menu_i)
 {
         char buf[32];
-        display.rect(0, 24, 128, 8, 0, true);
+        display.rect(0, 24, 128, 12, 0, true);
         snprintf(buf, 32, "%1u %1u %1u %1u", 
                 set_val[0],set_val[1],set_val[2],set_val[3]);
         display.text(buf, 36, 24, 1);
+        display.text("_", 36+(menu_i*16), 28, 1);
 }
 
 static std::optional<bool>
@@ -173,8 +174,9 @@ UI_Display::set_target(enum intEvent _e)
                 menu_i = 0; // Repurpose this variable
                 display.fill(0);
                 set_val.fill(0);
-                display.text("Set CO2 target", 9, 0, 1);
-                handle_draw_val(display, set_val);
+                display.text("SET CO2 TARGET", 9, 0, 1);
+                display.text("SW2 TO SAVE", 18, 54, 1);
+                handle_draw_val(display, set_val, menu_i);
                 display.show();
                 xTimerReset(inact_t, 0);
                 break;
@@ -184,12 +186,14 @@ UI_Display::set_target(enum intEvent _e)
                 case LEFT:
                         xTimerReset(inact_t, 0);
                         handle_var(ev, set_val[menu_i], 0, 9);
-                        handle_draw_val(display, set_val);
+                        handle_draw_val(display, set_val, menu_i);
                         display.show();
                         break;
                 case PRESS_SW0:
                         xTimerReset(inact_t, 0);
                         menu_i = ++menu_i % set_val.size();
+                        handle_draw_val(display, set_val, menu_i);
+                        display.show();
                         break;
                 case PRESS_SW2:
                         xTimerReset(inact_t, 0);
@@ -224,8 +228,8 @@ UI_Display::menu(enum intEvent _e)
         case Enter:
                 menu_i = 0;
                 display.fill(0);
-                display.text("Info", 18, 0, 1);
-                display.text("Set CO2", 18, 9, 1);
+                display.text("INFO", 18, 0, 1);
+                display.text("SET CO2 TARGET", 18, 9, 1);
                 display.text("->", 0, menu_i*9, 1);
                 display.show();
                 xTimerReset(inact_t, 0);
