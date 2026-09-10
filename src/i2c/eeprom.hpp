@@ -1,10 +1,10 @@
 #ifndef EEPROM_HPP
 #define EEPROM_HPP
 
+#include "FreeRTOS.h"
 #include "crc16.h"
 #include "PicoI2C.h"
 #include <cstring>
-#include "intnet.h"
 #include "event_groups.h"
 
 /* EEPROM 0x50 is the only device used on i2c0 */

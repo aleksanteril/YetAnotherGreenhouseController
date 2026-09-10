@@ -37,6 +37,8 @@ add_executable(${ProjectName}
         modbus/ModbusRegister.h
         modbus/ModbusClient.cpp
         modbus/ModbusClient.h
+        modbus/sensors.hpp
+        modbus/sensors.cpp
 
         display/framebuf.cpp
         display/framebuf.h
@@ -72,6 +74,7 @@ target_compile_definitions(${ProjectName} PRIVATE
 target_link_libraries(${ProjectName} 
         pico_stdlib
         hardware_i2c
+        pico_time
         FreeRTOS-Kernel-Heap4
         pico_cyw43_arch_lwip_sys_freertos
         pico_lwip_mbedtls

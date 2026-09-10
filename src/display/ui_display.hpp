@@ -10,6 +10,10 @@
 #include <array>
 #include "event_groups.h"
 
+constexpr uint SW0_PIN{ 9 };
+constexpr uint SW1_PIN{ 8 };
+constexpr uint SW2_PIN{ 7 };
+
 enum Event { LEFT, RIGHT, INACTIVE, UPDATE, 
         PRESS_SW0 = SW0_PIN, PRESS_SW1 = SW1_PIN, PRESS_SW2 = SW2_PIN};
 extern QueueHandle_t DisplayEvent_q;
@@ -17,7 +21,7 @@ extern QueueHandle_t DisplayEvent_q;
 // We are the sole device on I2C1, this project doesn't use the pressure sensor
 class UI_Display {
       public:
-        UI_Display(EEPROM& e);
+        explicit UI_Display(EEPROM& e);
         UI_Display(const UI_Display&) = delete;
         void
         loop();

@@ -5,28 +5,6 @@
 
 #define INACTIVE -1
 
-static inline std::optional<uint32_t>
-parse_ip(std::string_view& cmd)
-{
-        uint octets[4];
-        if(sscanf(cmd.data(), "%u.%u.%u.%u", 
-                octets, octets+1, octets+2, octets+3) != 4) {
-                return std::nullopt;
-        }
-        for(auto octet : octets) {
-                if(octet > 255) {
-                        // invalid
-                        return std::nullopt;
-                }
-        }
-        uint32_t ipaddr{ 
-                dec_to_inet(octets[0], octets[1], octets[2], octets[3]) };
-        if(!valid_ip(ipaddr)) {
-                return std::nullopt;
-        }
-        return ipaddr;
-}
-
 static inline std::optional<int>
 parse_setpoint(std::string_view& cmd)
 {
@@ -40,8 +18,11 @@ parse_setpoint(std::string_view& cmd)
         return setpoint;
 }
 
+
+constexpr uint UART0_TX_PIN{ 0 };
+constexpr uint UART0_RX_PIN{ 1 };
 Shell::Shell(EEPROM& e)
-: e(e)
+: u(0, UART0_TX_PIN, UART0_RX_PIN, 115200), e(e)
 {
 }
 

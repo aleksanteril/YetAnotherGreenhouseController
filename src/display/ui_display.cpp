@@ -1,17 +1,18 @@
-#include "metropolia_io.hpp"
 #include "ui_display.hpp"
 #include "hardware/gpio.h"
 #include "task.h"
 #include <string>
 #include <span>
-#include <string>
-#include "intnet.h"
 #include <optional>
 
 QueueHandle_t DisplayEvent_q{ nullptr };
 
 static EventGroupHandle_t _go{ nullptr };
 constexpr int PROCEED{ 0x1 };
+
+constexpr uint ROT_A_PIN{ 10 }; //ext pull-up
+constexpr uint ROT_B_PIN{ 11 }; //ext pull-up
+constexpr uint ROT_SW_PIN{ 12 };
 
 static void
 button_task(void* param) 
@@ -41,7 +42,6 @@ callback_irq(uint gpio, uint32_t event_mask)
         xQueueSendFromISR(DisplayEvent_q, (void*)&e, &xTaskWoken);
         portYIELD_FROM_ISR(xTaskWoken);
 }
-
 
 UI_Display::UI_Display(EEPROM& e)
   : eeprom(e)

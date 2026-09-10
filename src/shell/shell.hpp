@@ -3,14 +3,12 @@
 
 #include "FreeRTOS.h"
 #include <array>
-
-#include "metropolia_io.hpp"
 #include "PicoOsUart.h"
 #include "eeprom.hpp"
 
 class Shell {
       public:
-        Shell(EEPROM&);
+        explicit Shell(EEPROM&);
         Shell(const Shell&) = delete;
         void 
         loop();
@@ -25,7 +23,7 @@ class Shell {
         void 
         parse_cmd();
         
-        PicoOsUart u{ PicoOsUart(0 , UART0_TX_PIN, UART0_RX_PIN, 115200) };
+        PicoOsUart u;
         EEPROM& e;
         std::array<uint8_t, 64> buf;
         uint8_t* ptr{ buf.data() };
