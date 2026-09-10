@@ -70,7 +70,6 @@ Shell::print_usage()
                 "Options:\r\n"
                 "                help:   - print this help\r\n"
                 "                info:   - print current saved settings\r\n"
-                "  set ipv4 <A.B.C.D>:   - set cloud server IPv4 address\r\n"
                 "    set target <ppm>:   - set co2 ppm level (0 - 1500)\r\n" };
         u.send(msg);
 }
@@ -78,23 +77,17 @@ Shell::print_usage()
 void
 Shell::print_settings()
 {
-        uint32_t ipaddr{};
         uint16_t setpoint{};
-        bool ip_r{ e.load_ipaddr(ipaddr) };
-        bool set_r{ e.load_setpoint(setpoint) };
-        if(!ip_r || !set_r) {
+        if(!e.load_setpoint(setpoint)) {
                 constexpr const char* fail{ 
                         "Failed to load settings\r\n" };
                 u.send(fail);
                 return;
         }
         // Convert IPv4 to decimal notation
-        uint8_t a, b, c, d;
-        inet_to_dec(ipaddr, &a, &b, &c, &d);
         std::array<char, 64> msg;
         snprintf(msg.data(), msg.size(), 
-                "- CO2 Setpoint: %u ppm\r\n"
-                "- Server IPv4: %u.%u.%u.%u\r\n", setpoint, a,b,c,d);
+                "- CO2 Setpoint: %u ppm\r\n", setpoint);
         u.send(msg.data());
 }
 
@@ -171,15 +164,6 @@ Shell::parse_cmd()
                 print_usage();
         } else if (cmd == "info") {
                 print_settings();
-        } else if (cmd.starts_with("set ipv4 ")) {
-                cmd.remove_prefix(sizeof("set ipv4 ")-1);
-                auto ipaddr{ parse_ip(cmd) };
-                if(!ipaddr) {
-                        u.send(fail_parse);
-                        return;
-                } else if (e.save_ipaddr(*ipaddr) == false) {
-                        u.send(fail_save);
-                }
         } else if (cmd.starts_with("set target ")) {
                 cmd.remove_prefix(sizeof("set target ")-1);
                 auto setpoint{ parse_setpoint(cmd) };

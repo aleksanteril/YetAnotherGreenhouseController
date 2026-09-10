@@ -31,24 +31,19 @@ class UI_Display {
         status(enum intEvent);
 
         std::array<char, 16> info_setp;
-        std::array<char, 24> info_ipv4;
         void
         info(enum intEvent);
 
         void
         wait(enum intEvent);
 
-        void
-        handle_draw_val();
         std::array<int, 4> set_val{};
-        void
-        set_ipv4(enum intEvent);
         void
         set_target(enum intEvent);
         
         int menu_i{};
-        std::array<State, 3> items{ &UI_Display::info, 
-                &UI_Display::set_target, &UI_Display::set_ipv4 };
+        const std::array<State, 2> items{ &UI_Display::info, 
+                &UI_Display::set_target};
         void
         menu(enum intEvent);
         

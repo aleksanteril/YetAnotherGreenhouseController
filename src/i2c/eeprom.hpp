@@ -9,7 +9,7 @@
 
 // Memory alignment, SETPOINT 2b CRC16 2b ; IPADDR 4b CRC16 2b
 #define SETPOINT_ADDR 0x0
-#define IPADDR_ADDR SETPOINT_ADDR+4
+#define NETWORK_ADDR 0x64
 
 constexpr int GO_BITS{ 0x1 };
 
@@ -47,31 +47,6 @@ class EEPROM : private PicoI2C {
                                 return false;
                         }
                         setpoint = ((uint16_t)buf[0] << 8U) | buf[1];
-                        return true;
-                }
-
-                bool
-                save_ipaddr(uint32_t ipaddr)
-                {
-                        uint8_t buf[6];
-                        inet_to_dec(ipaddr, buf, buf+1, buf+2, buf+3);
-                        auto crc{ crc16(buf, 4) };
-                        buf[4] = (uint8_t)(crc >> 8U);
-                        buf[5] = (uint8_t)crc;
-                        return write_page(IPADDR_ADDR, buf, 6);
-                }
-
-                bool
-                load_ipaddr(uint32_t& ipaddr)
-                {
-                        uint8_t buf[6];
-                        if (read_page(IPADDR_ADDR, buf, 6) == false) {
-                                return false;
-                        }
-                        if (crc16(buf, 6) != 0) {
-                                return false;
-                        }
-                        ipaddr = dec_to_inet(buf[0], buf[1], buf[2], buf[3]);
                         return true;
                 }
 

@@ -73,20 +73,13 @@ UI_Display::change_state_to(State st)
 
 // Helper function for info state
 static bool
-read_info_eeprom(EEPROM& e, std::span<char> ipv4, std::span<char> setp)
+read_info_eeprom(EEPROM& e, std::span<char> setp)
 {
-        uint32_t ipaddr{};
         uint16_t setpoint{};
-        bool ip_r{ e.load_ipaddr(ipaddr) };
-        bool set_r{ e.load_setpoint(setpoint) };
-        if(!ip_r || !set_r) {
+        if(!e.load_setpoint(setpoint)) {
                 return false;
         }
-        // Convert IPv4 to decimal notation
-        uint8_t a, b, c, d;
-        inet_to_dec(ipaddr, &a, &b, &c, &d);
         snprintf(setp.data(), setp.size(), "- %4u ppm -", setpoint);
-        snprintf(ipv4.data(), setp.size(), "%u.%u.%u.%u", a,b,c,d);
         return true;
 }
 
@@ -96,11 +89,9 @@ UI_Display::info(enum intEvent _e)
         switch(_e) {
         case Enter:
                 display.fill(0);
-                if (read_info_eeprom(eeprom, info_ipv4, info_setp)) {
-                        display.text("CO2 Target", 0, 0, 1);
-                        display.text(info_setp.data(), 19, 10, 1);
-                        display.text("Cloud IPv4", 0, 24, 1);
-                        display.text(info_ipv4.data(), 4, 37, 1);
+                if (read_info_eeprom(eeprom, info_setp)) {
+                        display.text("CO2 Target", 24, 0, 1);
+                        display.text(info_setp.data(), 16, 10, 1);
                 } else {
                         display.text("Failed to load!", 0, 0, 1);
                 }
@@ -150,38 +141,13 @@ handle_var(Event ev, int& val, int min, int max)
 
 // helper function for similar ipv4 and setpoint setting
 void
-UI_Display::handle_draw_val()
+handle_draw_val(ssd1306os& display, std::span<int> set_val)
 {
         char buf[32];
         display.rect(0, 24, 128, 8, 0, true);
-        snprintf(buf, 32, "%3u %3u %3u %3u", 
+        snprintf(buf, 32, "%1u %1u %1u %1u", 
                 set_val[0],set_val[1],set_val[2],set_val[3]);
-        display.text(buf, 0, 24, 1);
-}
-
-// helper function to draw dots
-static void
-handle_draw_dots(ssd1306os& display)
-{
-        display.text(".", 24, 26, 1);
-        display.text(".", 56, 26, 1);
-        display.text(".", 88, 26, 1);
-}
-
-static std::optional<bool>
-save_valid_ipaddr(EEPROM& e, std::span<int> octets)
-{
-        for(auto octet : octets) {
-                if(octet > 255) {
-                        return std::nullopt;
-                }
-        }
-        uint32_t ipaddr{ dec_to_inet(
-                octets[0], octets[1], octets[2], octets[3]) };
-        if(!valid_ip(ipaddr)) {
-                return std::nullopt;
-        }
-        return e.save_ipaddr(ipaddr);
+        display.text(buf, 36, 24, 1);
 }
 
 static std::optional<bool>
@@ -200,60 +166,6 @@ save_valid_setpoint(EEPROM& e, std::span<int> vals)
 }
 
 void
-UI_Display::set_ipv4(enum intEvent _e)
-{
-        switch(_e) {
-        case Enter:
-                menu_i = 0; // Repurpose this variable
-                display.fill(0);
-                set_val.fill(255);
-                display.text("= set IPv4 adr =", 0, 0, 1);
-                handle_draw_val();
-                handle_draw_dots(display);
-                display.show();
-                xTimerReset(inact_t, 0);
-                break;
-        case Loop:
-                switch(ev) {
-                case RIGHT:
-                case LEFT:
-                        xTimerReset(inact_t, 0);
-                        handle_var(ev, set_val[menu_i], 0, 255);
-                        handle_draw_val();
-                        display.show();
-                        break;
-                case PRESS_SW0:
-                        xTimerReset(inact_t, 0);
-                        menu_i = ++menu_i % set_val.size();
-                        break;
-                case PRESS_SW2:
-                        xTimerReset(inact_t, 0);
-                        if (std::optional<bool> res; 
-                                !(res = save_valid_ipaddr(eeprom, set_val))) {
-                                display.fill(0);
-                                display.text("Invalid value!", 0, 0, 1);
-                                display.show();
-                                change_state_to(&UI_Display::wait);
-                        } else if (!*res) {
-                                //save failed
-                                display.fill(0);
-                                display.text("Save failed!", 0, 0, 1);
-                                display.show();
-                                change_state_to(&UI_Display::wait);
-                                break;
-                        } else {
-                                //save ok
-                                change_state_to(&UI_Display::menu);
-                        }
-                        break;
-                case INACTIVE:
-                        change_state_to(&UI_Display::status);
-                        break;
-                }
-        }     
-}
-
-void
 UI_Display::set_target(enum intEvent _e)
 {
         switch(_e) {
@@ -261,8 +173,8 @@ UI_Display::set_target(enum intEvent _e)
                 menu_i = 0; // Repurpose this variable
                 display.fill(0);
                 set_val.fill(0);
-                display.text("= set CO2 ppm =", 0, 0, 1);
-                handle_draw_val();
+                display.text("Set CO2 target", 9, 0, 1);
+                handle_draw_val(display, set_val);
                 display.show();
                 xTimerReset(inact_t, 0);
                 break;
@@ -272,7 +184,7 @@ UI_Display::set_target(enum intEvent _e)
                 case LEFT:
                         xTimerReset(inact_t, 0);
                         handle_var(ev, set_val[menu_i], 0, 9);
-                        handle_draw_val();
+                        handle_draw_val(display, set_val);
                         display.show();
                         break;
                 case PRESS_SW0:
@@ -315,7 +227,6 @@ UI_Display::menu(enum intEvent _e)
                 display.fill(0);
                 display.text("Info", 18, 0, 1);
                 display.text("Set CO2", 18, 9, 1);
-                display.text("Set IPv4", 18, 18, 1);
                 display.text("->", 0, menu_i*9, 1);
                 display.show();
                 xTimerReset(inact_t, 0);
@@ -325,7 +236,7 @@ UI_Display::menu(enum intEvent _e)
                 case RIGHT:
                 case LEFT:
                         xTimerReset(inact_t, 0);
-                        handle_var(ev, menu_i, 0, 2);
+                        handle_var(ev, menu_i, 0, items.size()-1);
                         display.rect(0, 0, 18, 64, 0, true);
                         display.text("->", 0, menu_i*9, 1);
                         display.show();
