@@ -41,7 +41,6 @@ class UI_Display {
         void
         handle_draw_val();
         std::array<int, 4> set_val{};
-        int res{};
         void
         set_ipv4(enum intEvent);
         void

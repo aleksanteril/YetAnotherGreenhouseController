@@ -1,46 +1,41 @@
 #include "shell.hpp"
 #include <cstring>
 #include <charconv>
+#include <optional>
 
 #define INACTIVE -1
 
-static inline bool 
-stop(char c)
-{
-        return c == '\r'  || c == '\n';
-}
-
-static inline uint32_t
+static inline std::optional<uint32_t>
 parse_ip(std::string_view& cmd)
 {
         uint octets[4];
         if(sscanf(cmd.data(), "%u.%u.%u.%u", 
                 octets, octets+1, octets+2, octets+3) != 4) {
-                return 0;
+                return std::nullopt;
         }
         for(auto octet : octets) {
                 if(octet > 255) {
                         // invalid
-                        return 0;
+                        return std::nullopt;
                 }
         }
         uint32_t ipaddr{ 
                 dec_to_inet(octets[0], octets[1], octets[2], octets[3]) };
         if(!valid_ip(ipaddr)) {
-                return 0;
+                return std::nullopt;
         }
         return ipaddr;
 }
 
-static inline int
+static inline std::optional<int>
 parse_setpoint(std::string_view& cmd)
 {
         int setpoint{};
         if(sscanf(cmd.data(), "%d", &setpoint) != 1) {
-                return -1; // maximum value not allowed;
+                return std::nullopt;
         }
         if(setpoint > 1500 || setpoint < 0) {
-                return -1;
+                return std::nullopt;
         }
         return setpoint;
 }
@@ -178,22 +173,20 @@ Shell::parse_cmd()
                 print_settings();
         } else if (cmd.starts_with("set ipv4 ")) {
                 cmd.remove_prefix(sizeof("set ipv4 ")-1);
-                uint32_t ipaddr{ parse_ip(cmd) };
-                if(ipaddr == 0) {
+                auto ipaddr{ parse_ip(cmd) };
+                if(!ipaddr) {
                         u.send(fail_parse);
                         return;
-                }
-                if (e.save_ipaddr(ipaddr) == false) {
+                } else if (e.save_ipaddr(*ipaddr) == false) {
                         u.send(fail_save);
                 }
         } else if (cmd.starts_with("set target ")) {
                 cmd.remove_prefix(sizeof("set target ")-1);
-                int setpoint{ parse_setpoint(cmd) };
-                if(setpoint == -1) {
+                auto setpoint{ parse_setpoint(cmd) };
+                if(!setpoint) {
                         u.send(fail_parse);
                         return;
-                }
-                if (e.save_setpoint(setpoint) == false) {
+                } else if (e.save_setpoint(*setpoint) == false) {
                         u.send(fail_save);
                 }
         } else {

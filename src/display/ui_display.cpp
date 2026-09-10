@@ -6,6 +6,7 @@
 #include <span>
 #include <string>
 #include "intnet.h"
+#include <optional>
 
 QueueHandle_t DisplayEvent_q{ nullptr };
 
@@ -71,7 +72,7 @@ UI_Display::change_state_to(State st)
 }
 
 // Helper function for info state
-static int
+static bool
 read_info_eeprom(EEPROM& e, std::span<char> ipv4, std::span<char> setp)
 {
         uint32_t ipaddr{};
@@ -79,14 +80,14 @@ read_info_eeprom(EEPROM& e, std::span<char> ipv4, std::span<char> setp)
         bool ip_r{ e.load_ipaddr(ipaddr) };
         bool set_r{ e.load_setpoint(setpoint) };
         if(!ip_r || !set_r) {
-                return -1;
+                return false;
         }
         // Convert IPv4 to decimal notation
         uint8_t a, b, c, d;
         inet_to_dec(ipaddr, &a, &b, &c, &d);
         snprintf(setp.data(), setp.size(), "- %4u ppm -", setpoint);
         snprintf(ipv4.data(), setp.size(), "%u.%u.%u.%u", a,b,c,d);
-        return 2;
+        return true;
 }
 
 void
@@ -95,13 +96,13 @@ UI_Display::info(enum intEvent _e)
         switch(_e) {
         case Enter:
                 display.fill(0);
-                if (read_info_eeprom(eeprom, info_ipv4, info_setp) < 0) {
-                        display.text("Failed to load!", 0, 0, 1);
-                } else {
+                if (read_info_eeprom(eeprom, info_ipv4, info_setp)) {
                         display.text("CO2 Target", 0, 0, 1);
                         display.text(info_setp.data(), 19, 10, 1);
                         display.text("Cloud IPv4", 0, 24, 1);
                         display.text(info_ipv4.data(), 4, 37, 1);
+                } else {
+                        display.text("Failed to load!", 0, 0, 1);
                 }
                 display.show();
                 xTimerReset(inact_t, 0);
@@ -167,23 +168,23 @@ handle_draw_dots(ssd1306os& display)
         display.text(".", 88, 26, 1);
 }
 
-static int
+static std::optional<bool>
 save_valid_ipaddr(EEPROM& e, std::span<int> octets)
 {
         for(auto octet : octets) {
                 if(octet > 255) {
-                        return -1;
+                        return std::nullopt;
                 }
         }
         uint32_t ipaddr{ dec_to_inet(
                 octets[0], octets[1], octets[2], octets[3]) };
         if(!valid_ip(ipaddr)) {
-                return -1;
+                return std::nullopt;
         }
         return e.save_ipaddr(ipaddr);
 }
 
-static int
+static std::optional<bool>
 save_valid_setpoint(EEPROM& e, std::span<int> vals)
 {
         //fast way to write but uses std::string heap etc
@@ -193,7 +194,7 @@ save_valid_setpoint(EEPROM& e, std::span<int> vals)
         }
         uint16_t setpoint = std::stoi(temp);
         if(setpoint < 0 || setpoint > 1500) {
-                return -1;
+                return std::nullopt;
         }
         return e.save_setpoint(setpoint);
 }
@@ -227,14 +228,21 @@ UI_Display::set_ipv4(enum intEvent _e)
                         break;
                 case PRESS_SW2:
                         xTimerReset(inact_t, 0);
-                        res = save_valid_ipaddr(eeprom, set_val);
-                        if (res <= 0) {
+                        if (std::optional<bool> res; 
+                                !(res = save_valid_ipaddr(eeprom, set_val))) {
                                 display.fill(0);
-                                res == -1 ? display.text("Invalid value!", 0, 0, 1) :
-                                            display.text("Save failed!", 0, 0, 1);
+                                display.text("Invalid value!", 0, 0, 1);
                                 display.show();
                                 change_state_to(&UI_Display::wait);
+                        } else if (!*res) {
+                                //save failed
+                                display.fill(0);
+                                display.text("Save failed!", 0, 0, 1);
+                                display.show();
+                                change_state_to(&UI_Display::wait);
+                                break;
                         } else {
+                                //save ok
                                 change_state_to(&UI_Display::menu);
                         }
                         break;
@@ -273,14 +281,21 @@ UI_Display::set_target(enum intEvent _e)
                         break;
                 case PRESS_SW2:
                         xTimerReset(inact_t, 0);
-                        res = save_valid_setpoint(eeprom, set_val);
-                        if (res <= 0) {
+                        if (std::optional<bool> res; 
+                                !(res = save_valid_setpoint(eeprom, set_val))) {
                                 display.fill(0);
-                                res == -1 ? display.text("Invalid value!", 0, 0, 1) :
-                                            display.text("Save failed!", 0, 0, 1);
+                                display.text("Invalid value!", 0, 0, 1);
                                 display.show();
                                 change_state_to(&UI_Display::wait);
+                        } else if (!*res) {
+                                //save failed
+                                display.fill(0);
+                                display.text("Save failed!", 0, 0, 1);
+                                display.show();
+                                change_state_to(&UI_Display::wait);
+                                break;
                         } else {
+                                //save ok
                                 change_state_to(&UI_Display::menu);
                         }
                         break;
