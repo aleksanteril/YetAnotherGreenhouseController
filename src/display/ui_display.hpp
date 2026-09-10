@@ -8,8 +8,10 @@
 #include "eeprom.hpp"
 #include "timers.h"
 #include <array>
+#include "event_groups.h"
 
-enum Event { LEFT, RIGHT, INACTIVE, UPDATE, PRESS_SW0 = SW0_PIN, PRESS_SW2 = SW2_PIN };
+enum Event { LEFT, RIGHT, INACTIVE, UPDATE, 
+        PRESS_SW0 = SW0_PIN, PRESS_SW1 = SW1_PIN, PRESS_SW2 = SW2_PIN};
 extern QueueHandle_t DisplayEvent_q;
 
 // We are the sole device on I2C1, this project doesn't use the pressure sensor
@@ -59,6 +61,9 @@ class UI_Display {
         inactivity_timer(TimerHandle_t xTimer);
         TimerHandle_t inact_t{ xTimerCreate("INACT_TMR", pdMS_TO_TICKS(20000), 
                 pdFALSE, nullptr, inactivity_timer) };
+
+        // To make button polling tasks go to sleep once not in menu
+        EventGroupHandle_t sw_tasks{ xEventGroupCreate() };
 
         EEPROM& eeprom;
 };

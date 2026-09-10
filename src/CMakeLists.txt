@@ -26,6 +26,7 @@ add_executable(${ProjectName}
         i2c/PicoI2C.cpp
         i2c/PicoI2C.h
         i2c/eeprom.hpp
+        i2c/eeprom.cpp
 
         uart/PicoOsUart.cpp
         uart/PicoOsUart.h

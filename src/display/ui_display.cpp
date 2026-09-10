@@ -10,6 +10,9 @@
 
 QueueHandle_t DisplayEvent_q{ nullptr };
 
+static EventGroupHandle_t _go{ nullptr };
+constexpr int PROCEED{ 0x1 };
+
 static void
 button_task(void* param) 
 {
@@ -26,6 +29,7 @@ button_task(void* param)
                         pressed = true;
                         xQueueSend(DisplayEvent_q, (void*)&pin, 0);
                 }
+                xEventGroupWaitBits(_go, PROCEED, pdFALSE, pdTRUE, portMAX_DELAY);
         }
 }
 
@@ -46,9 +50,13 @@ UI_Display::UI_Display(EEPROM& e)
         gpio_set_dir(ROT_A_PIN, GPIO_IN);
         gpio_init(ROT_B_PIN);
         gpio_set_dir(ROT_B_PIN, GPIO_IN);
+        // for global events to display (sensor updates etc)
         DisplayEvent_q = event_q;
+        // try not to pollute namespace, for button task internal use
+        _go = sw_tasks;
         gpio_set_irq_enabled_with_callback(
                 ROT_A_PIN, GPIO_IRQ_EDGE_FALL, true, callback_irq);
+        xEventGroupSetBits(sw_tasks, PROCEED);
         xTaskCreate(button_task, "BUTTON_SW0", 64, 
                 (void*)SW0_PIN, tskIDLE_PRIORITY + 2, NULL);
         xTaskCreate(button_task, "BUTTON_SW2", 64, 
@@ -259,6 +267,8 @@ UI_Display::status(enum intEvent _e)
 {
         switch(_e) {
         case Enter:
+                // Button tasks sleep
+                xEventGroupClearBits(sw_tasks, PROCEED);
                 display.fill(0);
                 display.text("Status", 0, 0, 1);
                 display.show();
@@ -271,6 +281,9 @@ UI_Display::status(enum intEvent _e)
                 case INACTIVE:
                         break;
                 }
+        case Exit:
+                // button tasks continue
+                xEventGroupSetBits(sw_tasks, PROCEED);
         }
 }
 
