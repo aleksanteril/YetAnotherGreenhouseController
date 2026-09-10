@@ -109,10 +109,13 @@ CO2_Valve::close()
 void
 CO2_Valve::set_output(int percent)
 {
-        if(percent <= 0) {
+        if(percent < 0) {
                 xTimerStop(tmr, 0);
                 close();
                 return;
+        } else if(percent < 5) {
+                // min of 500ms of co2
+                percent = 5;
         } else if(percent > 100) {
                 percent = 100;
         }
