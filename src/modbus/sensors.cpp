@@ -130,7 +130,7 @@ CO2_Valve::set_output(int percent)
 void
 CO2_Valve::valve_timer(TimerHandle_t xTimer)
 {
-        auto valve{ (CO2_Valve*)pvTimerGetTimerID(xTimer) };
+        auto* valve{ (CO2_Valve*)pvTimerGetTimerID(xTimer) };
         valve->open();
         add_alarm_in_ms(valve->open_ms, valve_shut_isr, (void*)valve, true);
 }

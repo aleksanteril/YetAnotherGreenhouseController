@@ -6,6 +6,8 @@ add_executable(${ProjectName}
         lansk/blinker.cpp
         lansk/blinker.h
 
+        constants.hpp
+
         utilities/rt_statistics.cpp
         utilities/rt_statistics.h
         utilities/crc16.cpp

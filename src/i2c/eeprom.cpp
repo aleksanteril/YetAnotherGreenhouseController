@@ -1,14 +1,16 @@
 #include "eeprom.hpp"
 
 // Memory alignment, SETPOINT 2b CRC16 2b ; IPADDR 4b CRC16 2b
-#define SETPOINT_ADDR 0x0
-#define NETWORK_ADDR 0x64
+constexpr uint SETPOINT_ADDR{ 0x0 };
+constexpr uint NETWORK_ADDR{ 0x64 };
 
 constexpr int GO_BITS{ 0x1 };
 
+constexpr int EEPROM_ADDR{ 0x50 };
+constexpr int I2C_SPEED{ 400000 };
 /* EEPROM 0x50 is the only device used on i2c0 */
-EEPROM::EEPROM(uint8_t addr, uint bus_nr)
-: PicoI2C(bus_nr, 400000), dev_addr(addr)
+EEPROM::EEPROM(uint bus_nr)
+: PicoI2C(bus_nr, I2C_SPEED), dev_addr(EEPROM_ADDR)
 {
         xEventGroupSetBits(go, GO_BITS);
 }
@@ -30,7 +32,7 @@ bool
 EEPROM::load_setpoint(uint16_t& setpoint)
 {
         uint8_t buf[4];
-        if (read_page(SETPOINT_ADDR, buf, 4) == false) {
+        if (!read_page(SETPOINT_ADDR, buf, 4)) {
                 return false;
         }
         if (crc16(buf, 4) != 0) {

@@ -10,7 +10,7 @@
 /* EEPROM 0x50 is the only device used on i2c0 */
 class EEPROM : private PicoI2C {
         public:
-                EEPROM(uint8_t addr=0x50, uint bus_nr=0);
+                EEPROM(uint bus_nr=0);
                 EEPROM(const EEPROM&) = delete;
                 bool 
                 save_setpoint(uint16_t setpoint);

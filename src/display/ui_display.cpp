@@ -4,10 +4,11 @@
 #include <string>
 #include <span>
 #include <optional>
+#include "constants.hpp"
 
 QueueHandle_t DisplayEvent_q{ nullptr };
 
-static EventGroupHandle_t _go{ nullptr };
+static EventGroupHandle_t intGo{ nullptr };
 constexpr int PROCEED{ 0x1 };
 
 constexpr uint ROT_A_PIN{ 10 }; //ext pull-up
@@ -30,7 +31,7 @@ button_task(void* param)
                         pressed = true;
                         xQueueSend(DisplayEvent_q, (void*)&pin, 0);
                 }
-                xEventGroupWaitBits(_go, PROCEED, pdFALSE, pdTRUE, portMAX_DELAY);
+                xEventGroupWaitBits(intGo, PROCEED, pdFALSE, pdTRUE, portMAX_DELAY);
         }
 }
 
@@ -53,7 +54,7 @@ UI_Display::UI_Display(EEPROM& e)
         // for global events to display (sensor updates etc)
         DisplayEvent_q = event_q;
         // try not to pollute namespace, for button task internal use
-        _go = sw_tasks;
+        intGo = sw_tasks;
         gpio_set_irq_enabled_with_callback(
                 ROT_A_PIN, GPIO_IRQ_EDGE_FALL, true, callback_irq);
         xEventGroupSetBits(sw_tasks, PROCEED);
@@ -151,11 +152,11 @@ handle_var(Event ev, int& val, int min, int max)
 void
 handle_draw_val(ssd1306os& display, std::span<int> set_val, int menu_i)
 {
-        char buf[32];
+        std::array<char, 32> buf;
         display.rect(0, 24, 128, 12, 0, true);
-        snprintf(buf, 32, "%1u %1u %1u %1u", 
+        snprintf(buf.data(), buf.size(), "%1u %1u %1u %1u", 
                 set_val[0],set_val[1],set_val[2],set_val[3]);
-        display.text(buf, 36, 24, 1);
+        display.text(buf.data(), 36, 24, 1);
         display.text("_", 36+(menu_i*16), 28, 1);
 }
 
@@ -168,7 +169,7 @@ save_valid_setpoint(EEPROM& e, std::span<int> vals)
                 temp += std::to_string(val);
         }
         uint16_t setpoint = std::stoi(temp);
-        if(setpoint < 0 || setpoint > 1500) {
+        if(setpoint < 0 || setpoint > MAX_CO2_SP) {
                 return std::nullopt;
         }
         return e.save_setpoint(setpoint);
@@ -274,12 +275,8 @@ UI_Display::status(enum intEvent _e)
                 display.show();
                 break;
         case Loop:
-                switch(ev) {
-                default:
+                if(ev != INACTIVE) {
                         change_state_to(&UI_Display::menu);
-                        break;
-                case INACTIVE:
-                        break;
                 }
         case Exit:
                 // button tasks continue

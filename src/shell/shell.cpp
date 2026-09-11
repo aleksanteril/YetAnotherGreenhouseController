@@ -2,8 +2,9 @@
 #include <cstring>
 #include <charconv>
 #include <optional>
+#include "constants.hpp"
 
-#define INACTIVE -1
+constexpr int INACTIVE{ -1 };
 
 static inline std::optional<int>
 parse_setpoint(std::string_view& cmd)
@@ -12,7 +13,7 @@ parse_setpoint(std::string_view& cmd)
         if(sscanf(cmd.data(), "%d", &setpoint) != 1) {
                 return std::nullopt;
         }
-        if(setpoint > 1500 || setpoint < 0) {
+        if(setpoint > MAX_CO2_SP || setpoint < 0) {
                 return std::nullopt;
         }
         return setpoint;
@@ -151,7 +152,8 @@ Shell::parse_cmd()
                 if(!setpoint) {
                         u.send(fail_parse);
                         return;
-                } else if (e.save_setpoint(*setpoint) == false) {
+                }
+                if (!e.save_setpoint(*setpoint)) {
                         u.send(fail_save);
                 }
         } else {
