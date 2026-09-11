@@ -59,7 +59,7 @@ class UI_Display {
 
         std::shared_ptr<PicoI2C> i2cbus{std::make_shared<PicoI2C>(1, 400000)};
         ssd1306os display{i2cbus};
-        QueueHandle_t event_q{ xQueueCreate(15, sizeof(Event)) };
+        const QueueHandle_t event_q{ xQueueCreate(15, sizeof(Event)) };
 
         static void
         inactivity_timer(TimerHandle_t xTimer);
@@ -67,7 +67,7 @@ class UI_Display {
                 pdFALSE, nullptr, inactivity_timer) };
 
         // To make button polling tasks go to sleep once not in menu
-        EventGroupHandle_t sw_tasks{ xEventGroupCreate() };
+        const EventGroupHandle_t sw_tasks{ xEventGroupCreate() };
 
         EEPROM& eeprom;
 };

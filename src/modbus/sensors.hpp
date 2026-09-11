@@ -74,7 +74,7 @@ class CO2_Valve {
         const uint led_pin;
         uint32_t open_ms{ 1000 };
 
-        TimerHandle_t tmr{ xTimerCreate("CO2 VALVE", 
+        const TimerHandle_t tmr{ xTimerCreate("CO2 VALVE", 
                 pdMS_TO_TICKS(30000), pdTRUE, (void*)this, valve_timer) };
         // Opens the valve and sets a ISR timer 1s to shut it
         static void
@@ -88,10 +88,8 @@ class P_Controller {
       public:
         // dir, true(default) = direct action, false = reverse action
         P_Controller(Device& d, int sp, double kp, bool dir=true)
-        : d(d), sp(sp), dir(dir) 
+        : d(d), sp(sp), kp(dir ? kp : (kp*-1)) 
         {
-                // dir, true(default) = direct action, false = reverse action
-                this->kp = dir ? kp : (kp*-1);
         }
         void
         loop(int pv)
@@ -104,8 +102,7 @@ class P_Controller {
 
       private:
         Device& d;
-        double kp;
-        bool dir;
+        const double kp;
 };
 
 #endif

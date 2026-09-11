@@ -19,7 +19,7 @@ class EEPROM : private PicoI2C {
 
         private:
                 const uint8_t dev_addr;
-                EventGroupHandle_t go{ xEventGroupCreate() };
+                const EventGroupHandle_t go{ xEventGroupCreate() };
                 // True on success
                 bool 
                 read_page(uint16_t addr, uint8_t* bytes, size_t len);
