@@ -73,7 +73,7 @@ PRODUAL::set_output(int percent)
 // co2 valve control
 static int64_t 
 valve_shut_isr(alarm_id_t id, void* user_data) {
-        auto valve{ (CO2_Valve*)user_data };
+        auto* valve{ (CO2_Valve*)user_data };
         valve->close();
         return 0;
 }
@@ -113,7 +113,8 @@ CO2_Valve::set_output(int percent)
                 xTimerStop(tmr, 0);
                 close();
                 return;
-        } else if(percent < 5) {
+        } 
+        if(percent < 5) {
                 // min of 500ms of co2
                 percent = 5;
         } else if(percent > 100) {
