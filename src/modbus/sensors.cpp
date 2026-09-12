@@ -88,7 +88,18 @@ PRODUAL::read_speed()
 void
 PRODUAL::write_speed(uint16_t val) 
 { 
-        speed.write(val > 1000 ? 1000 : val);
+        if(!running && val > 0) {
+                // kickstart to run
+                speed.write(600);
+                vTaskDelay(pdMS_TO_TICKS(10));
+                running = true;
+        } else if(running && val <= 0) {
+                speed.write(0);
+                running = false;
+        }
+        if(running) {
+                speed.write(val > 1000 ? 1000 : val);
+        }
 }
 
 void

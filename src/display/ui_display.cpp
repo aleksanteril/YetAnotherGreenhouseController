@@ -270,8 +270,18 @@ UI_Display::menu(enum intEvent _e)
 }
 
 void
-handle_draw_sensors(ssd1306os& display, double temp, double rh, uint16_t co2)
+handle_draw_sensors(ssd1306os& display)
 {
+        Sensors::SensorPacket_t packet;
+        xQueuePeek(Sensors::co2_mb, &packet, 0);
+        uint16_t co2{ packet.uint16 };
+        xQueuePeek(Sensors::rh_mb, &packet, 0);
+        double rh{ packet.doubl };
+        xQueuePeek(Sensors::temp_mb, &packet, 0);
+        double temp{ packet.doubl };
+        uint16_t sp{};
+        xQueuePeek(EEPROMCache::setpoint_mb, &sp, 0);
+
         display.fill(0);
         std::array<char, 32> buf;
         snprintf(buf.data(), buf.size(), "[TEMP: %6.1lf C]", temp);
@@ -280,6 +290,8 @@ handle_draw_sensors(ssd1306os& display, double temp, double rh, uint16_t co2)
         display.text(buf.data(), 0, 12, 1);
         snprintf(buf.data(), buf.size(), "[CO2: %5u ppm]", co2);
         display.text(buf.data(), 0, 24, 1);
+        snprintf(buf.data(), buf.size(), "%4u - SP", sp);
+        display.text(buf.data(), 56, 36, 1);
         display.show();
 }
 
@@ -290,27 +302,11 @@ UI_Display::status(enum intEvent _e)
         case Enter:
                 // Button tasks sleep
                 xEventGroupClearBits(sw_tasks, PROCEED);
-                {
-                        Sensors::SensorPacket_t packet;
-                        xQueuePeek(Sensors::co2_mb, &packet, 0);
-                        uint16_t co2{ packet.uint16 };
-                        xQueuePeek(Sensors::rh_mb, &packet, 0);
-                        double rh{ packet.doubl };
-                        xQueuePeek(Sensors::temp_mb, &packet, 0);
-                        double temp{ packet.doubl };
-                        handle_draw_sensors(display, temp, rh, co2);
-                }
+                handle_draw_sensors(display);
                 break;
         case Loop:
                 if(ev == UPDATE) {
-                        Sensors::SensorPacket_t packet;
-                        xQueuePeek(Sensors::co2_mb, &packet, 0);
-                        uint16_t co2{ packet.uint16 };
-                        xQueuePeek(Sensors::rh_mb, &packet, 0);
-                        double rh{ packet.doubl };
-                        xQueuePeek(Sensors::temp_mb, &packet, 0);
-                        double temp{ packet.doubl };
-                        handle_draw_sensors(display, temp, rh, co2);
+                        handle_draw_sensors(display);
                 } else if(ev != INACTIVE) {
                         change_state_to(&UI_Display::menu);
                 }

@@ -65,6 +65,7 @@ class PRODUAL {
         set_output(int percent);
 
       private:
+        bool running{ false };
         ModbusRegister wd;
         ModbusRegister speed;
 };
