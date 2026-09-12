@@ -55,7 +55,7 @@ class PRODUAL {
         PRODUAL(std::shared_ptr<ModbusClient> client_);
         PRODUAL(const PRODUAL&) = delete;
         int
-        read_wd();
+        read_counter();
         double
         read_speed();
         // 0 - 1000
@@ -63,10 +63,12 @@ class PRODUAL {
         write_speed(uint16_t val);
         void
         set_output(int percent);
+        bool
+        watchdog();
 
       private:
         bool running{ false };
-        ModbusRegister wd;
+        ModbusRegister counter;
         ModbusRegister speed;
 };
 

@@ -68,20 +68,32 @@ GMP252::read_co2()
 // fan control
 constexpr uint PRODUAL_ADDR{ 1 };
 PRODUAL::PRODUAL(std::shared_ptr<ModbusClient> client_)
-: wd(client_, PRODUAL_ADDR, 0, false), speed(client_, PRODUAL_ADDR, 0) 
+: counter(client_, PRODUAL_ADDR, 4, false), speed(client_, PRODUAL_ADDR, 0) 
 {
 }
 
 int
-PRODUAL::read_wd() 
+PRODUAL::read_counter() 
 { 
-        return wd.read(); 
+        return counter.read(); 
 }
 
 double
 PRODUAL::read_speed() 
 { 
         return (speed.read() / 10.0); 
+}
+
+bool
+PRODUAL::watchdog()
+{
+        if(running) {
+                //set running and counter comes back 0 fail
+                return (bool)read_counter();
+        } else {
+                //not running just ignore
+                return true;
+        }
 }
 
 // 0 - 1000
