@@ -63,9 +63,9 @@ UI_Display::UI_Display(EEPROM& e)
                 ROT_A_PIN, GPIO_IRQ_EDGE_FALL, true, callback_irq);
         xEventGroupSetBits(sw_tasks, PROCEED);
         xTaskCreate(button_task, "BUTTON_SW0", 64, 
-                (void*)SW0_PIN, tskIDLE_PRIORITY + 2, NULL);
+                (void*)SW0_PIN, tskIDLE_PRIORITY + 2, nullptr);
         xTaskCreate(button_task, "BUTTON_SW2", 64, 
-                (void*)SW2_PIN, tskIDLE_PRIORITY + 2, NULL);
+                (void*)SW2_PIN, tskIDLE_PRIORITY + 2, nullptr);
         change_state_to(&UI_Display::menu);
 }
 

@@ -30,11 +30,11 @@ main()
         static EEPROM e;
 
         xTaskCreate(shell_task, "SHELL", 
-                392, (void*)&e, tskIDLE_PRIORITY + 1, NULL);
+                392, (void*)&e, tskIDLE_PRIORITY + 1, nullptr);
         xTaskCreate(ui_task, "UI", 
-                320, (void*)&e, tskIDLE_PRIORITY + 1, NULL);
+                320, (void*)&e, tskIDLE_PRIORITY + 1, nullptr);
         xTaskCreate(controller_task, "CONTROLLER", 
-                256, (void*)&e, tskIDLE_PRIORITY + 2, NULL);
+                256, (void*)&e, tskIDLE_PRIORITY + 2, nullptr);
 
         printf("Start FreeRTOS scheduler\n");
         vTaskStartScheduler();

@@ -22,8 +22,9 @@ parse_setpoint(std::string_view& cmd)
 
 constexpr uint UART0_TX_PIN{ 0 };
 constexpr uint UART0_RX_PIN{ 1 };
+constexpr int UART0_BAUD{ 115200 };
 Shell::Shell(EEPROM& e)
-: u(0, UART0_TX_PIN, UART0_RX_PIN, 115200), e(e)
+: u(0, UART0_TX_PIN, UART0_RX_PIN, UART0_BAUD), e(e)
 {
 }
 
