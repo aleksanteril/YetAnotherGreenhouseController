@@ -5,8 +5,11 @@
 #include <span>
 #include <optional>
 #include "constants.hpp"
+#include <sensors.hpp>
 
-QueueHandle_t DisplayEvent_q{ nullptr };
+using namespace Display;
+
+QueueHandle_t Display::Event_q{ nullptr };
 
 static EventGroupHandle_t intGo{ nullptr };
 constexpr int PROCEED{ 0x1 };
@@ -29,7 +32,7 @@ button_task(void* param)
                         pressed = false;
                 } else if(!pressed) {
                         pressed = true;
-                        xQueueSend(DisplayEvent_q, (void*)&pin, 0);
+                        xQueueSend(Event_q, (void*)&pin, 0);
                 }
                 xEventGroupWaitBits(intGo, PROCEED, pdFALSE, pdTRUE, portMAX_DELAY);
         }
@@ -40,7 +43,7 @@ callback_irq(uint gpio, uint32_t event_mask)
 {
         auto xTaskWoken{ pdFALSE };
         Event e = gpio_get(ROT_B_PIN) ? RIGHT : LEFT;
-        xQueueSendFromISR(DisplayEvent_q, (void*)&e, &xTaskWoken);
+        xQueueSendFromISR(Event_q, (void*)&e, &xTaskWoken);
         portYIELD_FROM_ISR(xTaskWoken);
 }
 
@@ -52,7 +55,8 @@ UI_Display::UI_Display(EEPROM& e)
         gpio_init(ROT_B_PIN);
         gpio_set_dir(ROT_B_PIN, GPIO_IN);
         // for global events to display (sensor updates etc)
-        DisplayEvent_q = event_q;
+        Event_q = e_q;
+        vQueueAddToRegistry(Event_q, "DisplayEvent_q");
         // try not to pollute namespace, for button task internal use
         intGo = sw_tasks;
         gpio_set_irq_enabled_with_callback(
@@ -69,7 +73,7 @@ void
 UI_Display::inactivity_timer(TimerHandle_t xTimer)
 {
         Event e{ INACTIVE };
-        xQueueSend(DisplayEvent_q, &e, 0);
+        xQueueSend(Event_q, &e, 0);
 }
 
 void
@@ -102,7 +106,8 @@ UI_Display::info(enum intEvent _e)
                         display.text("CO2 TARGET", 24, 0, 1);
                         display.text(info_setp.data(), 16, 10, 1);
                 } else {
-                        display.text("Failed to load!", 0, 0, 1);
+                        display.text("EEPROM Fail!", 0, 0, 1);
+                        display.text("Failed to load!", 0, 9, 1);
                 }
                 display.show();
                 xTimerReset(inact_t, 0);
@@ -215,7 +220,8 @@ UI_Display::set_target(enum intEvent _e)
                         } else if (!*res) {
                                 //save failed
                                 display.fill(0);
-                                display.text("Save failed!", 0, 0, 1);
+                                display.text("Local value set.", 0, 0, 1);
+                                display.text("EEPROM Save fail!", 0, 9, 1);
                                 display.show();
                                 change_state_to(&UI_Display::wait);
                         } else {
@@ -264,18 +270,48 @@ UI_Display::menu(enum intEvent _e)
 }
 
 void
+handle_draw_sensors(ssd1306os& display, double temp, double rh, uint16_t co2)
+{
+        display.fill(0);
+        std::array<char, 32> buf;
+        snprintf(buf.data(), buf.size(), "[TEMP: %6.1lf C]", temp);
+        display.text(buf.data(), 0, 0, 1);
+        snprintf(buf.data(), buf.size(), "[RH: %8.1lf %%]", rh);
+        display.text(buf.data(), 0, 12, 1);
+        snprintf(buf.data(), buf.size(), "[CO2: %5u ppm]", co2);
+        display.text(buf.data(), 0, 24, 1);
+        display.show();
+}
+
+void
 UI_Display::status(enum intEvent _e)
 {
         switch(_e) {
         case Enter:
                 // Button tasks sleep
                 xEventGroupClearBits(sw_tasks, PROCEED);
-                display.fill(0);
-                display.text("Status", 0, 0, 1);
-                display.show();
+                {
+                        Sensors::SensorPacket_t packet;
+                        xQueuePeek(Sensors::co2_mb, &packet, 0);
+                        uint16_t co2{ packet.uint16 };
+                        xQueuePeek(Sensors::rh_mb, &packet, 0);
+                        double rh{ packet.doubl };
+                        xQueuePeek(Sensors::temp_mb, &packet, 0);
+                        double temp{ packet.doubl };
+                        handle_draw_sensors(display, temp, rh, co2);
+                }
                 break;
         case Loop:
-                if(ev != INACTIVE) {
+                if(ev == UPDATE) {
+                        Sensors::SensorPacket_t packet;
+                        xQueuePeek(Sensors::co2_mb, &packet, 0);
+                        uint16_t co2{ packet.uint16 };
+                        xQueuePeek(Sensors::rh_mb, &packet, 0);
+                        double rh{ packet.doubl };
+                        xQueuePeek(Sensors::temp_mb, &packet, 0);
+                        double temp{ packet.doubl };
+                        handle_draw_sensors(display, temp, rh, co2);
+                } else if(ev != INACTIVE) {
                         change_state_to(&UI_Display::menu);
                 }
         case Exit:
@@ -288,7 +324,7 @@ void
 UI_Display::loop()
 {
         for(;;) {
-                xQueueReceive(DisplayEvent_q, (void*)&ev, portMAX_DELAY);
+                xQueueReceive(Event_q, (void*)&ev, portMAX_DELAY);
                 (this->*state)(Loop);
         }
 }

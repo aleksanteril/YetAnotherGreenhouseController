@@ -6,13 +6,22 @@
 #include "timers.h"
 #include <cmath>
 
-struct SensorVal_t {
-        TickType_t timestamp;
-        union value {
-                double doubl;
-                uint16_t uint16;
+namespace Sensors
+{
+        struct SensorPacket_t {
+                TickType_t timestamp;
+                union {
+                        double doubl;
+                        uint16_t uint16;
+                };
         };
-};
+
+        // Sensor values mailboxes that can be peeked to read current val.
+        extern QueueHandle_t rh_mb;
+        extern QueueHandle_t temp_mb;
+        extern QueueHandle_t co2_mb;
+}
+
 
 // humidity and temp sensor
 class HMP60 {
@@ -30,10 +39,14 @@ class HMP60 {
 };
 
 // co2 sensor
-class GMP252 : public ModbusRegister {
+class GMP252 {
       public:
         GMP252(std::shared_ptr<ModbusClient> client_);
         GMP252(const GMP252&) = delete;
+        uint16_t
+        read_co2();
+      private:
+        ModbusRegister co2;
 };
 
 // fan control

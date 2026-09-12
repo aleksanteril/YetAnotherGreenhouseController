@@ -1,23 +1,37 @@
 #include "eeprom.hpp"
 
+QueueHandle_t EEPROMCache::setpoint_mb{ nullptr };
+QueueHandle_t EEPROMCache::network_mb{ nullptr };
+
 // Memory alignment, SETPOINT 2b CRC16 2b ; IPADDR 4b CRC16 2b
 constexpr uint SETPOINT_ADDR{ 0x0 };
 constexpr uint NETWORK_ADDR{ 0x64 };
-
 constexpr int GO_BITS{ 0x1 };
-
 constexpr int EEPROM_ADDR{ 0x50 };
 constexpr int I2C_SPEED{ 400000 };
+
 /* EEPROM 0x50 is the only device used on i2c0 */
 EEPROM::EEPROM(uint bus_nr)
 : PicoI2C(bus_nr, I2C_SPEED), dev_addr(EEPROM_ADDR)
 {
+        EEPROMCache::setpoint_mb = xQueueCreate(1, sizeof(uint16_t));
+        EEPROMCache::network_mb = xQueueCreate(1, 
+                                sizeof(EEPROMCache::NetworkSetting_t));
+        vQueueAddToRegistry(EEPROMCache::setpoint_mb, "SETPOINT_MB");
+        vQueueAddToRegistry(EEPROMCache::network_mb, "NETWORK_MB");
+        uint16_t sp = EEPROMCache::DEFAULT_SETPOINT;
+        xQueueOverwrite(EEPROMCache::setpoint_mb, (void*)&sp);
+        auto packet = EEPROMCache::DEFAULT_NETWORK;
+        xQueueOverwrite(EEPROMCache::network_mb, &packet);
         xEventGroupSetBits(go, GO_BITS);
 }
 
 bool 
 EEPROM::save_setpoint(uint16_t setpoint)
 {
+        // Hook to change setpoint even though it doesnt save, allowing
+        // use without EEPROM
+        xQueueOverwrite(EEPROMCache::setpoint_mb, (void*)&setpoint);
         // 4 bytes
         uint8_t buf[4];
         buf[0] = (uint8_t)(setpoint >> 8U);
@@ -39,6 +53,7 @@ EEPROM::load_setpoint(uint16_t& setpoint)
                 return false;
         }
         setpoint = ((uint16_t)buf[0] << 8U) | buf[1];
+        xQueueOverwrite(EEPROMCache::setpoint_mb, &setpoint);
         return true;
 }
 

@@ -2,30 +2,66 @@
 #include "hardware/gpio.h"
 #include "pico/time.h"
 
+// Sensor values mailboxes that can be peeked to read current val.
+QueueHandle_t Sensors::rh_mb{ nullptr };
+QueueHandle_t Sensors::temp_mb{ nullptr };
+QueueHandle_t Sensors::co2_mb{ nullptr };
+
+using namespace Sensors;
+
 // humidity and temp sensor
 constexpr uint HMP60_ADDR{ 241 };
 HMP60::HMP60(std::shared_ptr<ModbusClient> client_)
 : rh(client_, HMP60_ADDR, 256), temp(client_, HMP60_ADDR, 257) 
 {
+        rh_mb = xQueueCreate(1, sizeof(SensorPacket_t));
+        vQueueAddToRegistry(rh_mb, "RH_MB");
+        temp_mb = xQueueCreate(1, sizeof(SensorPacket_t));
+        vQueueAddToRegistry(temp_mb, "TEMP_MB");
 }
 
 double
 HMP60::read_rh() 
 { 
-        return (rh.read() / 10.0); 
+        double val{ (rh.read() / 10.0) }; 
+        Sensors::SensorPacket_t packet{
+                .timestamp = xTaskGetTickCount(),
+                .doubl = val
+        };
+        xQueueOverwrite(rh_mb, (void*)&packet);
+        return val;
 }
 double
 HMP60::read_temp() 
 { 
-        return (temp.read() / 10.0); 
+        double val{ (temp.read() / 10.0) }; 
+        Sensors::SensorPacket_t packet{
+                .timestamp = xTaskGetTickCount(),
+                .doubl = val
+        };
+        xQueueOverwrite(temp_mb, (void*)&packet);
+        return val;
 }
 
 // co2 sensor
 constexpr uint GMP252_ADDR{ 240 };
 GMP252::GMP252(std::shared_ptr<ModbusClient> client_) 
-: ModbusRegister(client_, GMP252_ADDR, 256) 
+: co2(client_, GMP252_ADDR, 256) 
 {
+        co2_mb = xQueueCreate(1, sizeof(SensorPacket_t));
+        vQueueAddToRegistry(co2_mb, "CO2_MB");
+}
 
+uint16_t
+GMP252::read_co2()
+{
+        uint16_t val{ co2.read() };
+        Sensors::SensorPacket_t packet{
+                .timestamp = xTaskGetTickCount(),
+                .uint16 = val
+        };
+        xQueueOverwrite(co2_mb, (void*)&packet);
+        return val;
 }
 
 

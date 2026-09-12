@@ -7,6 +7,22 @@
 #include <cstring>
 #include "event_groups.h"
 
+namespace EEPROMCache
+{
+        constexpr uint16_t DEFAULT_SETPOINT{ 1000 };
+        extern QueueHandle_t setpoint_mb;
+
+        struct NetworkSetting_t {
+                char ssid[33];
+                char pwd[64];
+        };
+        constexpr EEPROMCache::NetworkSetting_t DEFAULT_NETWORK {
+                .ssid = "ssid",
+                .pwd = "pwd"
+        };
+        extern QueueHandle_t network_mb;
+}
+
 /* EEPROM 0x50 is the only device used on i2c0 */
 class EEPROM : private PicoI2C {
         public:

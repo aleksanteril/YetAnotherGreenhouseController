@@ -140,7 +140,8 @@ Shell::parse_cmd()
         *ptr = '\0';
 
         constexpr const char* fail_parse{ "Invalid value\r\n" };
-        constexpr const char* fail_save{ "Save failed, try again\r\n" };
+        constexpr const char* fail_save{ "Local value set.\r\n"
+                                         "EEPROM Save failed.\r\n" };
         //Parse command
         if(cmd == "help") {
                 print_usage();
