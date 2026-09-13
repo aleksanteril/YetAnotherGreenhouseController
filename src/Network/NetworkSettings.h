@@ -8,9 +8,9 @@ struct NetworkSettings {
     char password[64]      = "";
 
     // ThingSpeak keys
-    char api_key[24]       = "371DAWENQKI6J8DD";
+    char api_key[24]       = "1WWH2NWXSM53URR5";   // channel write key (/update.json)
     int  talkback_id       = 52920;
-    char talkback_key[24]  = "1WWH2NWXSM53URR5";
+    char talkback_key[24]  = "371DAWENQKI6J8DD";   // TalkBack queue key
 
     int send_interval_ms   = 16000;
 

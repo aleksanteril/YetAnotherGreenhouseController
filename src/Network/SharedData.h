@@ -4,12 +4,12 @@
 #include "Fmutex.h"
 
 struct GreenhouseData {
-    double co2_ppm      = 0;      // field1 - measured CO2 level
-    double humidity     = 0;      // field2 - relative humidity (%)
-    double temperature  = 0;      // field3 - temperature (C)
-    double fan_percent  = 0;      // field4 - ventilation fan speed 0-100%
-    double setpoint_ppm = 0;      // field5 - CO2 set point
-    bool  valid         = false;  // true once at least one measurement exists
+    float co2_ppm      = 0;      // field1 - measured CO2 level
+    float humidity     = 0;      // field2 - relative humidity (%)
+    float temperature  = 0;      // field3 - temperature (C)
+    float fan_percent  = 0;      // field4 - ventilation fan speed 0-100%
+    float setpoint_ppm = 0;      // field5 - CO2 set point
+    bool  valid        = false;  // true once at least one measurement exists
 };
 
 class SharedData {
@@ -23,7 +23,7 @@ public:
         return copy;
     }
 
-    void set_measurements(double co2_ppm, double humidity, double temperature, double fan_percent) {
+    void set_measurements(float co2_ppm, float humidity, float temperature, float fan_percent) {
         mutex.lock();
         data.co2_ppm = co2_ppm;
         data.humidity = humidity;
@@ -39,9 +39,9 @@ public:
         mutex.unlock();
     }
 
-    double get_setpoint() {
+    float get_setpoint() {
         mutex.lock();
-        double sp = data.setpoint_ppm;
+        float sp = data.setpoint_ppm;
         mutex.unlock();
         return sp;
     }
