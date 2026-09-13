@@ -37,6 +37,11 @@ add_executable(${ProjectName}
         modbus/ModbusClient.cpp
         modbus/ModbusClient.h
 
+        network/network.cpp
+        Network/NetworkSettings.h
+        Network/ThingSpeakClient.cpp
+        Network/ThingSpeakClient.h
+
         display/framebuf.cpp
         display/framebuf.h
         display/mono_vlsb.cpp

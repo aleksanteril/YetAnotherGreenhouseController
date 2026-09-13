@@ -4,19 +4,18 @@
 #include "Fmutex.h"
 
 struct GreenhouseData {
-    float co2_ppm      = 0;      // field1 - measured CO2 level
-    float humidity     = 0;      // field2 - relative humidity (%)
-    float temperature  = 0;      // field3 - temperature (C)
-    float fan_percent  = 0;      // field4 - ventilation fan speed 0-100%
-    float setpoint_ppm = 0;      // field5 - CO2 set point
-    bool  valid        = false;  // true once at least one measurement exists
+    double co2_ppm      = 0;      // field1 - measured CO2 level
+    double humidity     = 0;      // field2 - relative humidity (%)
+    double temperature  = 0;      // field3 - temperature (C)
+    double fan_percent  = 0;      // field4 - ventilation fan speed 0-100%
+    double setpoint_ppm = 0;      // field5 - CO2 set point
+    bool  valid         = false;  // true once at least one measurement exists
 };
 
-class Shared_data {
+class SharedData {
 public:
     SharedData() = default;
 
-    // --- Whole-snapshot access (used by the network task) ---
     GreenhouseData get() {
         mutex.lock();
         GreenhouseData copy = data;
@@ -24,27 +23,25 @@ public:
         return copy;
     }
 
-    // --- Controller task updates the measured environment ---
-    void set_measurements(float co2, float rh, float temp, float fan) {
+    void set_measurements(double co2_ppm, double humidity, double temperature, double fan_percent) {
         mutex.lock();
-        data.co2_ppm = co2;
-        data.humidity_rh = rh;
-        data.temperature = temp;
-        data.fan_percent = fan;
+        data.co2_ppm = co2_ppm;
+        data.humidity = humidity;
+        data.temperature = temperature;
+        data.fan_percent = fan_percent;
         data.valid = true;
         mutex.unlock();
     }
 
-    // --- Setpoint is read/written from several places (UI, cloud) ---
     void set_setpoint(float sp) {
         mutex.lock();
         data.setpoint_ppm = sp;
         mutex.unlock();
     }
 
-    float get_setpoint() {
+    double get_setpoint() {
         mutex.lock();
-        float sp = data.setpoint_ppm;
+        double sp = data.setpoint_ppm;
         mutex.unlock();
         return sp;
     }
