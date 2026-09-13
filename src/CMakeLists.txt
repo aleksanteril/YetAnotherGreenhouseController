@@ -6,6 +6,8 @@ add_executable(${ProjectName}
         lansk/blinker.cpp
         lansk/blinker.h
 
+        constants.hpp
+
         utilities/rt_statistics.cpp
         utilities/rt_statistics.h
         utilities/crc16.cpp
@@ -26,6 +28,7 @@ add_executable(${ProjectName}
         i2c/PicoI2C.cpp
         i2c/PicoI2C.h
         i2c/eeprom.hpp
+        i2c/eeprom.cpp
 
         uart/PicoOsUart.cpp
         uart/PicoOsUart.h
@@ -36,6 +39,8 @@ add_executable(${ProjectName}
         modbus/ModbusRegister.h
         modbus/ModbusClient.cpp
         modbus/ModbusClient.h
+        modbus/sensors.hpp
+        modbus/sensors.cpp
 
         display/framebuf.cpp
         display/framebuf.h
@@ -71,6 +76,7 @@ target_compile_definitions(${ProjectName} PRIVATE
 target_link_libraries(${ProjectName} 
         pico_stdlib
         hardware_i2c
+        pico_time
         FreeRTOS-Kernel-Heap4
         pico_cyw43_arch_lwip_sys_freertos
         pico_lwip_mbedtls
