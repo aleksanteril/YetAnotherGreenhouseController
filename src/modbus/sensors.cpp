@@ -170,7 +170,7 @@ CO2_Valve::set_output(int percent)
 {
         if(percent < 0) {
                 xTimerStop(tmr, 0);
-                close();
+                //close();
                 return;
         } 
         if(percent < 5) {
