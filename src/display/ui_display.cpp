@@ -1,13 +1,22 @@
-#include "metropolia_io.hpp"
 #include "ui_display.hpp"
 #include "hardware/gpio.h"
 #include "task.h"
 #include <string>
 #include <span>
-#include <string>
-#include "intnet.h"
+#include <optional>
+#include "constants.hpp"
+#include <sensors.hpp>
 
-QueueHandle_t DisplayEvent_q{ nullptr };
+using namespace Display;
+
+QueueHandle_t Display::Event_q{ nullptr };
+
+static EventGroupHandle_t intGo{ nullptr };
+constexpr int PROCEED{ 0x1 };
+
+constexpr uint ROT_A_PIN{ 10 }; //ext pull-up
+constexpr uint ROT_B_PIN{ 11 }; //ext pull-up
+constexpr uint ROT_SW_PIN{ 12 };
 
 static void
 button_task(void* param) 
@@ -23,8 +32,9 @@ button_task(void* param)
                         pressed = false;
                 } else if(!pressed) {
                         pressed = true;
-                        xQueueSend(DisplayEvent_q, (void*)&pin, 0);
+                        xQueueSend(Event_q, (void*)&pin, 0);
                 }
+                xEventGroupWaitBits(intGo, PROCEED, pdFALSE, pdTRUE, portMAX_DELAY);
         }
 }
 
@@ -33,25 +43,29 @@ callback_irq(uint gpio, uint32_t event_mask)
 {
         auto xTaskWoken{ pdFALSE };
         Event e = gpio_get(ROT_B_PIN) ? RIGHT : LEFT;
-        xQueueSendFromISR(DisplayEvent_q, (void*)&e, &xTaskWoken);
+        xQueueSendFromISR(Event_q, (void*)&e, &xTaskWoken);
         portYIELD_FROM_ISR(xTaskWoken);
 }
 
-
-UI_Display::UI_Display(EEPROM* e)
+UI_Display::UI_Display(EEPROM& e)
   : eeprom(e)
 {
         gpio_init(ROT_A_PIN);
         gpio_set_dir(ROT_A_PIN, GPIO_IN);
         gpio_init(ROT_B_PIN);
         gpio_set_dir(ROT_B_PIN, GPIO_IN);
-        DisplayEvent_q = event_q;
+        // for global events to display (sensor updates etc)
+        Event_q = e_q;
+        vQueueAddToRegistry(Event_q, "DisplayEvent_q");
+        // try not to pollute namespace, for button task internal use
+        intGo = sw_tasks;
         gpio_set_irq_enabled_with_callback(
                 ROT_A_PIN, GPIO_IRQ_EDGE_FALL, true, callback_irq);
+        xEventGroupSetBits(sw_tasks, PROCEED);
         xTaskCreate(button_task, "BUTTON_SW0", 64, 
-                (void*)SW0_PIN, tskIDLE_PRIORITY + 2, NULL);
+                (void*)SW0_PIN, tskIDLE_PRIORITY + 2, nullptr);
         xTaskCreate(button_task, "BUTTON_SW2", 64, 
-                (void*)SW2_PIN, tskIDLE_PRIORITY + 2, NULL);
+                (void*)SW2_PIN, tskIDLE_PRIORITY + 2, nullptr);
         change_state_to(&UI_Display::menu);
 }
 
@@ -59,7 +73,7 @@ void
 UI_Display::inactivity_timer(TimerHandle_t xTimer)
 {
         Event e{ INACTIVE };
-        xQueueSend(DisplayEvent_q, &e, 0);
+        xQueueSend(Event_q, &e, 0);
 }
 
 void
@@ -71,22 +85,15 @@ UI_Display::change_state_to(State st)
 }
 
 // Helper function for info state
-static int
-read_info_eeprom(EEPROM* e, std::span<char> ipv4, std::span<char> setp)
+static bool
+read_info_eeprom(EEPROM& e, std::span<char> setp)
 {
-        uint32_t ipaddr{};
         uint16_t setpoint{};
-        bool ip_r{ e->load_ipaddr(&ipaddr) };
-        bool set_r{ e->load_setpoint(&setpoint) };
-        if(!ip_r || !set_r) {
-                return -1;
+        if(!e.load_setpoint(setpoint)) {
+                return false;
         }
-        // Convert IPv4 to decimal notation
-        uint8_t a, b, c, d;
-        inet_to_dec(ipaddr, &a, &b, &c, &d);
         snprintf(setp.data(), setp.size(), "- %4u ppm -", setpoint);
-        snprintf(ipv4.data(), setp.size(), "%u.%u.%u.%u", a,b,c,d);
-        return 2;
+        return true;
 }
 
 void
@@ -95,13 +102,12 @@ UI_Display::info(enum intEvent _e)
         switch(_e) {
         case Enter:
                 display.fill(0);
-                if (read_info_eeprom(eeprom, info_ipv4, info_setp) < 0) {
-                        display.text("Failed to load!", 0, 0, 1);
+                if (read_info_eeprom(eeprom, info_setp)) {
+                        display.text("CO2 TARGET", 24, 0, 1);
+                        display.text(info_setp.data(), 16, 10, 1);
                 } else {
-                        display.text("CO2 Target", 0, 0, 1);
-                        display.text(info_setp.data(), 19, 10, 1);
-                        display.text("Cloud IPv4", 0, 24, 1);
-                        display.text(info_ipv4.data(), 4, 37, 1);
+                        display.text("EEPROM Fail!", 0, 0, 1);
+                        display.text("Failed to load!", 0, 9, 1);
                 }
                 display.show();
                 xTimerReset(inact_t, 0);
@@ -149,42 +155,18 @@ handle_var(Event ev, int& val, int min, int max)
 
 // helper function for similar ipv4 and setpoint setting
 void
-UI_Display::handle_draw_val()
+handle_draw_val(ssd1306os& display, std::span<int> set_val, int menu_i)
 {
-        char buf[32];
-        display.rect(0, 24, 128, 8, 0, true);
-        snprintf(buf, 32, "%3u %3u %3u %3u", 
+        std::array<char, 32> buf;
+        display.rect(0, 24, 128, 12, 0, true);
+        snprintf(buf.data(), buf.size(), "%1u %1u %1u %1u", 
                 set_val[0],set_val[1],set_val[2],set_val[3]);
-        display.text(buf, 0, 24, 1);
+        display.text(buf.data(), 36, 24, 1);
+        display.text("_", 36+(menu_i*16), 28, 1);
 }
 
-// helper function to draw dots
-static void
-handle_draw_dots(ssd1306os& display)
-{
-        display.text(".", 24, 26, 1);
-        display.text(".", 56, 26, 1);
-        display.text(".", 88, 26, 1);
-}
-
-static int
-save_valid_ipaddr(EEPROM* e, std::span<int> octets)
-{
-        for(auto octet : octets) {
-                if(octet > 255) {
-                        return -1;
-                }
-        }
-        uint32_t ipaddr{ dec_to_inet(
-                octets[0], octets[1], octets[2], octets[3]) };
-        if(!valid_ip(ipaddr)) {
-                return -1;
-        }
-        return e->save_ipaddr(ipaddr);
-}
-
-static int
-save_valid_setpoint(EEPROM* e, std::span<int> vals)
+static std::optional<bool>
+save_valid_setpoint(EEPROM& e, std::span<int> vals)
 {
         //fast way to write but uses std::string heap etc
         std::string temp;
@@ -192,57 +174,10 @@ save_valid_setpoint(EEPROM* e, std::span<int> vals)
                 temp += std::to_string(val);
         }
         uint16_t setpoint = std::stoi(temp);
-        if(setpoint < 0 || setpoint > 1500) {
-                return -1;
+        if(setpoint < 0 || setpoint > MAX_CO2_SP) {
+                return std::nullopt;
         }
-        return e->save_setpoint(setpoint);
-}
-
-void
-UI_Display::set_ipv4(enum intEvent _e)
-{
-        switch(_e) {
-        case Enter:
-                menu_i = 0; // Repurpose this variable
-                display.fill(0);
-                set_val.fill(255);
-                display.text("= set IPv4 adr =", 0, 0, 1);
-                handle_draw_val();
-                handle_draw_dots(display);
-                display.show();
-                xTimerReset(inact_t, 0);
-                break;
-        case Loop:
-                switch(ev) {
-                case RIGHT:
-                case LEFT:
-                        xTimerReset(inact_t, 0);
-                        handle_var(ev, set_val[menu_i], 0, 255);
-                        handle_draw_val();
-                        display.show();
-                        break;
-                case PRESS_SW0:
-                        xTimerReset(inact_t, 0);
-                        menu_i = ++menu_i % set_val.size();
-                        break;
-                case PRESS_SW2:
-                        xTimerReset(inact_t, 0);
-                        res = save_valid_ipaddr(eeprom, set_val);
-                        if (res <= 0) {
-                                display.fill(0);
-                                res == -1 ? display.text("Invalid value!", 0, 0, 1) :
-                                            display.text("Save failed!", 0, 0, 1);
-                                display.show();
-                                change_state_to(&UI_Display::wait);
-                        } else {
-                                change_state_to(&UI_Display::menu);
-                        }
-                        break;
-                case INACTIVE:
-                        change_state_to(&UI_Display::status);
-                        break;
-                }
-        }     
+        return e.save_setpoint(setpoint);
 }
 
 void
@@ -253,8 +188,9 @@ UI_Display::set_target(enum intEvent _e)
                 menu_i = 0; // Repurpose this variable
                 display.fill(0);
                 set_val.fill(0);
-                display.text("= set CO2 ppm =", 0, 0, 1);
-                handle_draw_val();
+                display.text("SET CO2 TARGET", 9, 0, 1);
+                display.text("SW2 TO SAVE", 18, 54, 1);
+                handle_draw_val(display, set_val, menu_i);
                 display.show();
                 xTimerReset(inact_t, 0);
                 break;
@@ -264,23 +200,32 @@ UI_Display::set_target(enum intEvent _e)
                 case LEFT:
                         xTimerReset(inact_t, 0);
                         handle_var(ev, set_val[menu_i], 0, 9);
-                        handle_draw_val();
+                        handle_draw_val(display, set_val, menu_i);
                         display.show();
                         break;
                 case PRESS_SW0:
                         xTimerReset(inact_t, 0);
                         menu_i = ++menu_i % set_val.size();
+                        handle_draw_val(display, set_val, menu_i);
+                        display.show();
                         break;
                 case PRESS_SW2:
                         xTimerReset(inact_t, 0);
-                        res = save_valid_setpoint(eeprom, set_val);
-                        if (res <= 0) {
+                        if (std::optional<bool> res; 
+                                !(res = save_valid_setpoint(eeprom, set_val))) {
                                 display.fill(0);
-                                res == -1 ? display.text("Invalid value!", 0, 0, 1) :
-                                            display.text("Save failed!", 0, 0, 1);
+                                display.text("Invalid value!", 0, 0, 1);
+                                display.show();
+                                change_state_to(&UI_Display::wait);
+                        } else if (!*res) {
+                                //save failed
+                                display.fill(0);
+                                display.text("Local value set.", 0, 0, 1);
+                                display.text("EEPROM Save fail!", 0, 9, 1);
                                 display.show();
                                 change_state_to(&UI_Display::wait);
                         } else {
+                                //save ok
                                 change_state_to(&UI_Display::menu);
                         }
                         break;
@@ -298,9 +243,8 @@ UI_Display::menu(enum intEvent _e)
         case Enter:
                 menu_i = 0;
                 display.fill(0);
-                display.text("Info", 18, 0, 1);
-                display.text("Set CO2", 18, 9, 1);
-                display.text("Set IPv4", 18, 18, 1);
+                display.text("INFO", 18, 0, 1);
+                display.text("SET CO2 TARGET", 18, 9, 1);
                 display.text("->", 0, menu_i*9, 1);
                 display.show();
                 xTimerReset(inact_t, 0);
@@ -310,7 +254,7 @@ UI_Display::menu(enum intEvent _e)
                 case RIGHT:
                 case LEFT:
                         xTimerReset(inact_t, 0);
-                        handle_var(ev, menu_i, 0, 2);
+                        handle_var(ev, menu_i, 0, items.size()-1);
                         display.rect(0, 0, 18, 64, 0, true);
                         display.text("->", 0, menu_i*9, 1);
                         display.show();
@@ -326,22 +270,49 @@ UI_Display::menu(enum intEvent _e)
 }
 
 void
+handle_draw_sensors(ssd1306os& display)
+{
+        Sensors::SensorPacket_t packet;
+        xQueuePeek(Sensors::co2_mb, &packet, 0);
+        uint16_t co2{ packet.uint16 };
+        xQueuePeek(Sensors::rh_mb, &packet, 0);
+        double rh{ packet.doubl };
+        xQueuePeek(Sensors::temp_mb, &packet, 0);
+        double temp{ packet.doubl };
+        uint16_t sp{};
+        xQueuePeek(EEPROMCache::setpoint_mb, &sp, 0);
+
+        display.fill(0);
+        std::array<char, 32> buf;
+        snprintf(buf.data(), buf.size(), "[TEMP: %6.1lf C]", temp);
+        display.text(buf.data(), 0, 0, 1);
+        snprintf(buf.data(), buf.size(), "[RH: %8.1lf %%]", rh);
+        display.text(buf.data(), 0, 12, 1);
+        snprintf(buf.data(), buf.size(), "[CO2: %5u ppm]", co2);
+        display.text(buf.data(), 0, 24, 1);
+        snprintf(buf.data(), buf.size(), "%4u - SP", sp);
+        display.text(buf.data(), 56, 36, 1);
+        display.show();
+}
+
+void
 UI_Display::status(enum intEvent _e)
 {
         switch(_e) {
         case Enter:
-                display.fill(0);
-                display.text("Status", 0, 0, 1);
-                display.show();
+                // Button tasks sleep
+                xEventGroupClearBits(sw_tasks, PROCEED);
+                handle_draw_sensors(display);
                 break;
         case Loop:
-                switch(ev) {
-                default:
+                if(ev == UPDATE) {
+                        handle_draw_sensors(display);
+                } else if(ev != INACTIVE) {
                         change_state_to(&UI_Display::menu);
-                        break;
-                case INACTIVE:
-                        break;
                 }
+        case Exit:
+                // button tasks continue
+                xEventGroupSetBits(sw_tasks, PROCEED);
         }
 }
 
@@ -349,7 +320,7 @@ void
 UI_Display::loop()
 {
         for(;;) {
-                xQueueReceive(DisplayEvent_q, (void*)&ev, portMAX_DELAY);
+                xQueueReceive(Event_q, (void*)&ev, portMAX_DELAY);
                 (this->*state)(Loop);
         }
 }
