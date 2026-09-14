@@ -79,7 +79,7 @@ controller_task(void* param)
         P_Controller pid_fan(fan, 2000, 2, false);
         int sp{};
         xQueuePeek(EEPROMCache::setpoint_mb, &sp, 0);
-        P_Controller pid_valve(valve, sp, 0.15);
+        P_Controller pid_valve(valve, sp, 0.12);
 
         Display::Event updt{ Display::UPDATE };
         for(;;) {
