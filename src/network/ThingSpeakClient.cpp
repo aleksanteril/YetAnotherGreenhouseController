@@ -79,8 +79,7 @@ bool ThingSpeakClient::send_update(const ThingSpeakPacket &data) {
         "&field2=%.1lf" 
         "&field3=%.1lf"                      
         "&field4=%d" 
-        "&field5=%d" 
-        "HTTP/1.1\r\n" 
+        "&field5=%d HTTP/1.1\r\n" 
         "Host: api.thingspeak.com\r\n" 
         "\r\n",
         cfg.api_key,
