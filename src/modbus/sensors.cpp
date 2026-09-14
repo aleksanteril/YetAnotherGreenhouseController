@@ -173,9 +173,9 @@ CO2_Valve::set_output(int percent)
                 //close();
                 return;
         } 
-        if(percent < 5) {
+        if(percent < 10) {
                 // min 1s of co2
-                percent = 5;
+                percent = 10;
         } else if(percent > 30) {
                 // max 3s of co2
                 percent = 30;
