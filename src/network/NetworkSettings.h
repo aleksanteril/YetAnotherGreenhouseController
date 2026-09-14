@@ -17,12 +17,6 @@ struct ThingSpeakConfig {
     const char* talkback_key  = TS_TALCKBACK_KEY;
 
     const char* server_ip     = TS_SERVER_IP;
-
-    int send_interval_ms   = 16000;
-
-    bool valid() const {
-        return ssid[0] != '\0' && api_key[0] != '\0';
-    }
 };
 
 #endif //CO2CONTROLLER_NETWORK_H

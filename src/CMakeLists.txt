@@ -43,7 +43,7 @@ add_executable(${ProjectName}
         modbus/sensors.cpp
 
         network/NetworkSettings.h
-        network/SharedData.h
+        network/ThingSpeakPacket.h
         network/ThingSpeakClient.cpp
         network/ThingSpeakClient.h
 

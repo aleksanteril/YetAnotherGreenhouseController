@@ -11,7 +11,6 @@
 #include "ui_display.hpp"
 #include "ModbusClient.h"
 #include "sensors.hpp"
-#include "SharedData.h"
 #include "ThingSpeakClient.h"
 #include "constants.hpp"
 
@@ -129,30 +128,6 @@ shell_task(void* param)
         }
 }
 
-static bool parse_setpoint_command(const char *cmd, int *out_setpoint) {
-        if (!cmd || !out_setpoint) {
-                return false;
-        }
-
-        int val;
-        char extra;
-        if (sscanf(cmd, "SETPOINT %d %c", &val, &extra) !=
-            1) { // Returns 1 if only a value is found after SETPOINT
-                return false;
-        }
-
-        // Check the valid range 0 - 1500 ppm
-        if (val < 0) {
-                val = 0;
-        }
-        if (val > MAX_CO2_SP) {
-                val = MAX_CO2_SP;
-        }
-
-        *out_setpoint = val;
-        return true;
-}
-
 void network_task(void *param) {
 
         EEPROMCache::NetworkSetting_t wlan;
@@ -165,9 +140,11 @@ void network_task(void *param) {
         };
         ThingSpeakClient client(ipstack, cfg, cfg.server_ip, 80);
         for(;;) {
-                vTaskDelay(pdMS_TO_TICKS(cfg.send_interval_ms));
+                // send every 30s
+                vTaskDelay(pdMS_TO_TICKS(30'000));
 
-                GreenhouseData data;
+                // build data packet, peek mailboxes
+                ThingSpeakPacket data;
                 Sensors::SensorPacket_t packet;
                 xQueuePeek(Sensors::co2_mb, &packet, 0);
                 data.co2_ppm = packet.uint16;
@@ -176,19 +153,15 @@ void network_task(void *param) {
                 xQueuePeek(Sensors::rh_mb, &packet, 0);
                 data.humidity = packet.doubl;
                 xQueuePeek(EEPROMCache::setpoint_mb, &data.setpoint_ppm, 0);
-                data.fan_percent = 0;
+                data.fan_percent = 0; // right now unused
 
                 // Push measurements to the cloud.
-                bool ok = client.send_update(data);
-
-                // Check TalkBack for a remote setpoint command.
-                /*
-                char cmd[64];
-                if (client.poll_talkback(cmd, sizeof(cmd))) {
-                        if (int new_sp; parse_setpoint_command(cmd, &new_sp)) {
-                                
+                if (!client.send_update(data)) {
+                        // try to reconnect to wifi
+                        while(!client.reconnect()) {
+                                // retry every 1 min
+                                vTaskDelay(pdMS_TO_TICKS(60'000));
+                        }
                 }
-                */
-                
         }
 }

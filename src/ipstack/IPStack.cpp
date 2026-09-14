@@ -9,7 +9,8 @@
 
 // To remove Pico example debugging functions during refactoring
 //#define DEBUG_printf(x, ...) {}
-#define DEBUG_printf printf
+//#define DEBUG_printf printf
+#define DEBUG_printf
 #define DUMP_BYTES(A, B) {}
 
 
@@ -27,6 +28,10 @@ IPStack::IPStack(const char *ssid, const char *pw) : tcp_pcb{nullptr}, dropped{0
         DEBUG_printf("Connected.\n");
     }
 
+}
+
+int IPStack::reconnect_wifi(const char* ssid, const char* pw) {
+    return cyw43_arch_wifi_connect_timeout_ms(ssid, pw, CYW43_AUTH_WPA2_AES_PSK, 30'000);
 }
 
 int IPStack::connect(uint32_t hostname, int port) {

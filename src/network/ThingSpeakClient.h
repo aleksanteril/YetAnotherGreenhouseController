@@ -2,8 +2,9 @@
 #define CO2CONTROLLER_THINGSPEAK_CLIENT_H
 
 #include "NetworkSettings.h"
-#include "SharedData.h"
+#include "ThingSpeakPacket.h"
 #include "IPStack.h"
+#include <array>
 
 class ThingSpeakClient {
 public:
@@ -11,13 +12,19 @@ public:
                      const char *server_ip, int port = 80);
 
     // Returns true if the server replied
-    bool send_update(const GreenhouseData &data);
+    bool send_update(const ThingSpeakPacket &data);
 
     // On success, copies the command string into out_cmd and returns true
     // Returns false if there is no command, on network error, or on parse failure
     bool poll_talkback(char *out_cmd, int out_cmd_size);
 
     void set_server_ip(const char *ip);
+
+    bool parse_setpoint(const char *cmd, int *out_setpoint);
+
+    // reconnect to wifi, or change current wifi to new one
+    bool reconnect();
+    bool reconnect(const char* ssid, const char* pwd);
 
 private:
     // Perform one request/response exchange
@@ -32,9 +39,9 @@ private:
     static const char *http_body(const char *response);
 
     IPStack &ip;
-    const ThingSpeakConfig &cfg;
-    char server_ip[32];
-    int  port;
+    ThingSpeakConfig &cfg;
+    const char* server_ip;
+    int port;
 };
 
 #endif //CO2CONTROLLER_THINGSPEAK_CLIENT_H

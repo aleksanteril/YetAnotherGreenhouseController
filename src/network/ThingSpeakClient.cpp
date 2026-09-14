@@ -4,33 +4,25 @@
 
 #include <cstdio>
 #include <string.h>
+#include "constants.hpp"
 
 // Response buffer for ThingSpeak's replies and headers.
 #define RESP_BUF_SIZE  1024
 
 ThingSpeakClient::ThingSpeakClient(IPStack &ipstack, ThingSpeakConfig &settings, const char *server_ip, const int port)
-                                  : ip(ipstack), cfg(settings), port(port) {
-    set_server_ip(server_ip);
-}
-
-void ThingSpeakClient::set_server_ip(const char *ip) {
-    if (ip) {
-        strncpy(server_ip, ip, sizeof(server_ip) - 1);
-        server_ip[sizeof(server_ip) - 1] = '\0';
-    }
+: ip(ipstack), cfg(settings), port(port), server_ip(server_ip) 
+{
 }
 
 int ThingSpeakClient::exchange(const char *request, char *resp_buf, int resp_buf_size) {
     int rc = ip.connect(server_ip, port);
     if (rc != 0) {
-        printf("ThingSpeak TCP connect to %s:%d failed rc=%d\n", server_ip, port, rc);
         return -1;
     }
 
     int wlen = (int)strlen(request);
     int wr = ip.write((unsigned char *)request, wlen, 1000);
     if (wr < 0) {
-        printf("ThingSpeak write failed rc=%d\n", wr);
         ip.disconnect();
         return -2;
     }
@@ -76,17 +68,17 @@ const char *ThingSpeakClient::http_body(const char *response) {
     return nullptr;
 }
 
-bool ThingSpeakClient::send_update(const GreenhouseData &data) {
+bool ThingSpeakClient::send_update(const ThingSpeakPacket &data) {
     // field1=CO2, field2=RH, field3=Temp, field4=Fan%, field5=Setpoint
     char body[256];
     const int body_len = snprintf(
         body, sizeof(body),
         "api_key=%s"
-        "&field1=%.0f"
-        "&field2=%.1f"
-        "&field3=%.1f"
-        "&field4=%.0f"
-        "&field5=%.0f",
+        "&field1=%d"
+        "&field2=%.1lf"
+        "&field3=%.1lf"
+        "&field4=%d"
+        "&field5=%d",
         cfg.api_key,
         data.co2_ppm,
         data.humidity,
@@ -95,7 +87,6 @@ bool ThingSpeakClient::send_update(const GreenhouseData &data) {
         data.setpoint_ppm);
 
     if (body_len < 0 || body_len >= (int)sizeof(body)) {
-        printf("ThingSpeak update body overflow\n");
         return false;
     }
 
@@ -112,7 +103,6 @@ bool ThingSpeakClient::send_update(const GreenhouseData &data) {
         body_len, body);
 
     if (req_len < 0 || req_len >= (int)sizeof(request)) {
-        printf("ThingSpeak update request overflow\n");
         return false;
     }
 
@@ -124,7 +114,6 @@ bool ThingSpeakClient::send_update(const GreenhouseData &data) {
 
     int status = http_status_code(resp);
     // /update.json returns the new entry id in the body on success, and 200.
-    printf("ThingSpeak update status=%d\n", status);
     return status == 200;
 }
 
@@ -201,4 +190,44 @@ bool ThingSpeakClient::poll_talkback(char *out_cmd, int out_cmd_size) {
     out_cmd[i] = '\0';
 
     return i > 0;
+}
+
+bool 
+ThingSpeakClient::parse_setpoint(const char *cmd, int *out_setpoint) 
+{
+        if (!cmd || !out_setpoint) {
+                return false;
+        }
+
+        int val{};
+        char extra{};
+        if (sscanf(cmd, "SETPOINT %d %c", &val, &extra) !=
+            1) { // Returns 1 if only a value is found after SETPOINT
+                return false;
+        }
+
+        // Check the valid range 0 - 1500 ppm
+        if (val < 0) {
+                val = 0;
+        }
+        if (val > MAX_CO2_SP) {
+                val = MAX_CO2_SP;
+        }
+
+        *out_setpoint = val;
+        return true;
+}
+
+bool
+ThingSpeakClient::reconnect() 
+{
+        return ip.reconnect_wifi(cfg.ssid, cfg.password) == 0;
+}
+
+bool
+ThingSpeakClient::reconnect(const char* ssid, const char* pwd)
+{
+        cfg.ssid = ssid;
+        cfg.password = pwd;
+        return ip.reconnect_wifi(ssid, pwd) == 0;
 }
