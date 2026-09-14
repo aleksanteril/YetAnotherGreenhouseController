@@ -7,6 +7,8 @@
 #include <cstring>
 #include "event_groups.h"
 
+#include "secret.h"
+
 namespace EEPROMCache
 {
         constexpr uint16_t DEFAULT_SETPOINT{ 1000 };
@@ -17,8 +19,8 @@ namespace EEPROMCache
                 char pwd[64];
         };
         constexpr EEPROMCache::NetworkSetting_t DEFAULT_NETWORK {
-                .ssid = "ssid",
-                .pwd = "pwd"
+                .ssid = WIFI_SSID,
+                .pwd = WIFI_PASSWORD
         };
         extern QueueHandle_t network_mb;
 }

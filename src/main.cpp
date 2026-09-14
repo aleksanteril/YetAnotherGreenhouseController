@@ -2,6 +2,7 @@
 #include "pico/stdio.h"
 #include "task.h"
 #include "queue.h"
+#include "IPStack.h"
 
 // this is needed for runtime statistics
 #include "rt_statistics.h"
@@ -10,6 +11,8 @@
 #include "ui_display.hpp"
 #include "ModbusClient.h"
 #include "sensors.hpp"
+#include "ThingSpeakClient.h"
+#include "constants.hpp"
 
 void
 controller_task(void* param);
@@ -19,6 +22,8 @@ void
 shell_task(void* param);
 void
 ui_task(void* param);
+void
+network_task(void* param);
 
 int 
 main()
@@ -29,12 +34,14 @@ main()
         // Only device @ 0x50 on i2c0
         static EEPROM e;
 
-        xTaskCreate(shell_task, "SHELL", 
+        xTaskCreate(shell_task, "SHELL",
                 392, (void*)&e, tskIDLE_PRIORITY + 1, nullptr);
         xTaskCreate(ui_task, "UI", 
                 320, (void*)&e, tskIDLE_PRIORITY + 1, nullptr);
         xTaskCreate(controller_task, "CONTROLLER", 
                 256, (void*)&e, tskIDLE_PRIORITY + 2, nullptr);
+        xTaskCreate(network_task, "NETWORK",
+                2048, nullptr, tskIDLE_PRIORITY + 1, NULL);
 
         printf("Start FreeRTOS scheduler\n");
         vTaskStartScheduler();
@@ -79,7 +86,7 @@ controller_task(void* param)
         P_Controller pid_fan(fan, 2000, 2, false);
         int sp{};
         xQueuePeek(EEPROMCache::setpoint_mb, &sp, 0);
-        P_Controller pid_valve(valve, sp, 0.15);
+        P_Controller pid_valve(valve, sp, 0.1);
 
         Display::Event updt{ Display::UPDATE };
         for(;;) {
@@ -118,5 +125,43 @@ shell_task(void* param)
         for(;;) {
                 // Task sleeps until activity starts on UART0
                 sh.loop();
+        }
+}
+
+void network_task(void *param) {
+
+        EEPROMCache::NetworkSetting_t wlan;
+        xQueuePeek(EEPROMCache::network_mb, &wlan, portMAX_DELAY);
+        IPStack ipstack(wlan.ssid, wlan.pwd);
+
+        ThingSpeakConfig cfg {
+                .ssid = wlan.ssid,
+                .password = wlan.pwd
+        };
+        ThingSpeakClient client(ipstack, cfg, cfg.server_ip, 80);
+        for(;;) {
+                // send every 30s
+                vTaskDelay(pdMS_TO_TICKS(30'000));
+
+                // build data packet, peek mailboxes
+                ThingSpeakPacket data;
+                Sensors::SensorPacket_t packet;
+                xQueuePeek(Sensors::co2_mb, &packet, 0);
+                data.co2_ppm = packet.uint16;
+                xQueuePeek(Sensors::temp_mb, &packet, 0);
+                data.temperature = packet.doubl;
+                xQueuePeek(Sensors::rh_mb, &packet, 0);
+                data.humidity = packet.doubl;
+                xQueuePeek(EEPROMCache::setpoint_mb, &data.setpoint_ppm, 0);
+                data.fan_percent = 0; // right now unused
+
+                // Push measurements to the cloud.
+                if (!client.send_update(data)) {
+                        // try to reconnect
+                        while(!client.reconnect()) {
+                                // retry every 1 min
+                                vTaskDelay(pdMS_TO_TICKS(60'000));
+                        }
+                }
         }
 }
