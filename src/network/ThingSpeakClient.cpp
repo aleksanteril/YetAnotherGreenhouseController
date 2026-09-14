@@ -70,37 +70,25 @@ const char *ThingSpeakClient::http_body(const char *response) {
 
 bool ThingSpeakClient::send_update(const ThingSpeakPacket &data) {
     // field1=CO2, field2=RH, field3=Temp, field4=Fan%, field5=Setpoint
-    char body[256];
-    const int body_len = snprintf(
-        body, sizeof(body),
-        "api_key=%s"
-        "&field1=%d"
-        "&field2=%.1lf"
-        "&field3=%.1lf"
-        "&field4=%d"
-        "&field5=%d",
+
+    char request[256];
+    const int req_len = snprintf(
+        request, sizeof(request),
+        "GET /update?api_key=%s" 
+        "&field1=%d" 
+        "&field2=%.1lf" 
+        "&field3=%.1lf"                      
+        "&field4=%d" 
+        "&field5=%d" 
+        "HTTP/1.1\r\n" 
+        "Host: api.thingspeak.com\r\n" 
+        "\r\n",
         cfg.api_key,
         data.co2_ppm,
         data.humidity,
         data.temperature,
         data.fan_percent,
         data.setpoint_ppm);
-
-    if (body_len < 0 || body_len >= (int)sizeof(body)) {
-        return false;
-    }
-
-    char request[512];
-    const int req_len = snprintf(
-        request, sizeof(request),
-        "POST /update.json HTTP/1.1\r\n"
-        "Host: " THINGSPEAK_HOST "\r\n"
-        "Connection: close\r\n"
-        "Content-Type: application/x-www-form-urlencoded\r\n"
-        "Content-Length: %d\r\n"
-        "\r\n"
-        "%s",
-        body_len, body);
 
     if (req_len < 0 || req_len >= (int)sizeof(request)) {
         return false;
