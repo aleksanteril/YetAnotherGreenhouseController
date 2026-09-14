@@ -168,18 +168,18 @@ CO2_Valve::close()
 void
 CO2_Valve::set_output(int percent)
 {
-        if(percent < 0) {
+        if(percent <= 0) {
                 xTimerStop(tmr, 0);
                 //close();
                 return;
         } 
         if(percent < 5) {
-                // min of 500ms of co2
+                // min 1s of co2
                 percent = 5;
-        } else if(percent > 100) {
-                percent = 100;
+        } else if(percent > 30) {
+                // max 3s of co2
+                percent = 30;
         }
-        // allow max 10s of valve continuously open
         open_ms = percent*100;
         if(xTimerIsTimerActive(tmr) == pdFALSE) {
                 xTimerStart(tmr, 0);
