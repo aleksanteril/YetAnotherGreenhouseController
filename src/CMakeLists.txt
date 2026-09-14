@@ -44,8 +44,6 @@ add_executable(${ProjectName}
 
         network/NetworkSettings.h
         network/SharedData.h
-        network/NetworkTask.cpp
-        network/NetworkTask.h
         network/ThingSpeakClient.cpp
         network/ThingSpeakClient.h
 

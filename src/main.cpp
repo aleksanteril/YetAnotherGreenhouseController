@@ -2,6 +2,7 @@
 #include "pico/stdio.h"
 #include "task.h"
 #include "queue.h"
+#include "IPStack.h"
 
 // this is needed for runtime statistics
 #include "rt_statistics.h"
@@ -10,8 +11,9 @@
 #include "ui_display.hpp"
 #include "ModbusClient.h"
 #include "sensors.hpp"
-#include "NetworkTask.h"
 #include "SharedData.h"
+#include "ThingSpeakClient.h"
+#include "constants.hpp"
 
 void
 controller_task(void* param);
@@ -21,10 +23,8 @@ void
 shell_task(void* param);
 void
 ui_task(void* param);
-
-// All connection parameters come from the NetworkSettings (+secret.h).
-static SharedData        g_shared;
-static NetworkTaskParams g_net_params{ &g_shared, NetworkSettings{} };
+void
+network_task(void* param);
 
 int 
 main()
@@ -42,7 +42,7 @@ main()
         xTaskCreate(controller_task, "CONTROLLER", 
                 256, (void*)&e, tskIDLE_PRIORITY + 2, nullptr);
         xTaskCreate(network_task, "NETWORK",
-                2048, (void*)&g_net_params, tskIDLE_PRIORITY + 1, NULL);
+                2048, nullptr, tskIDLE_PRIORITY + 1, NULL);
 
         printf("Start FreeRTOS scheduler\n");
         vTaskStartScheduler();
@@ -126,5 +126,69 @@ shell_task(void* param)
         for(;;) {
                 // Task sleeps until activity starts on UART0
                 sh.loop();
+        }
+}
+
+static bool parse_setpoint_command(const char *cmd, int *out_setpoint) {
+        if (!cmd || !out_setpoint) {
+                return false;
+        }
+
+        int val;
+        char extra;
+        if (sscanf(cmd, "SETPOINT %d %c", &val, &extra) !=
+            1) { // Returns 1 if only a value is found after SETPOINT
+                return false;
+        }
+
+        // Check the valid range 0 - 1500 ppm
+        if (val < 0) {
+                val = 0;
+        }
+        if (val > MAX_CO2_SP) {
+                val = MAX_CO2_SP;
+        }
+
+        *out_setpoint = val;
+        return true;
+}
+
+void network_task(void *param) {
+
+        EEPROMCache::NetworkSetting_t wlan;
+        xQueuePeek(EEPROMCache::network_mb, &wlan, portMAX_DELAY);
+        IPStack ipstack(wlan.ssid, wlan.pwd);
+
+        ThingSpeakConfig cfg {
+                .ssid = wlan.ssid,
+                .password = wlan.pwd
+        };
+        ThingSpeakClient client(ipstack, cfg, cfg.server_ip, 80);
+        for(;;) {
+                vTaskDelay(pdMS_TO_TICKS(cfg.send_interval_ms));
+
+                GreenhouseData data;
+                Sensors::SensorPacket_t packet;
+                xQueuePeek(Sensors::co2_mb, &packet, 0);
+                data.co2_ppm = packet.uint16;
+                xQueuePeek(Sensors::temp_mb, &packet, 0);
+                data.temperature = packet.doubl;
+                xQueuePeek(Sensors::rh_mb, &packet, 0);
+                data.humidity = packet.doubl;
+                xQueuePeek(EEPROMCache::setpoint_mb, &data.setpoint_ppm, 0);
+                data.fan_percent = 0;
+
+                // Push measurements to the cloud.
+                bool ok = client.send_update(data);
+
+                // Check TalkBack for a remote setpoint command.
+                /*
+                char cmd[64];
+                if (client.poll_talkback(cmd, sizeof(cmd))) {
+                        if (int new_sp; parse_setpoint_command(cmd, &new_sp)) {
+                                
+                }
+                */
+                
         }
 }

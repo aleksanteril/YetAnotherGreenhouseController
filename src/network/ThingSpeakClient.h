@@ -7,7 +7,7 @@
 
 class ThingSpeakClient {
 public:
-    ThingSpeakClient(IPStack &ipstack, const NetworkSettings &settings,
+    ThingSpeakClient(IPStack &ipstack, ThingSpeakConfig &settings,
                      const char *server_ip, int port = 80);
 
     // Returns true if the server replied
@@ -32,7 +32,7 @@ private:
     static const char *http_body(const char *response);
 
     IPStack &ip;
-    const NetworkSettings &cfg;
+    const ThingSpeakConfig &cfg;
     char server_ip[32];
     int  port;
 };
