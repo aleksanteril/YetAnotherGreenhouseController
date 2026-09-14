@@ -221,7 +221,14 @@ ThingSpeakClient::parse_setpoint(const char *cmd, int *out_setpoint)
 bool
 ThingSpeakClient::reconnect() 
 {
-        return ip.reconnect_wifi(cfg.ssid, cfg.password) == 0;
+        bool ok{};
+        // probe dns server to see we are on wifi
+        if(ip.connect("8.8.8.8", 53) != 0) {
+                // we arent on the internet
+                ok = ip.reconnect_wifi(cfg.ssid, cfg.password) == 0;
+        }
+        ip.disconnect();
+        return ok;
 }
 
 bool

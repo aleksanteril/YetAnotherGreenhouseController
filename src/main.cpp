@@ -157,7 +157,7 @@ void network_task(void *param) {
 
                 // Push measurements to the cloud.
                 if (!client.send_update(data)) {
-                        // try to reconnect to wifi
+                        // try to reconnect
                         while(!client.reconnect()) {
                                 // retry every 1 min
                                 vTaskDelay(pdMS_TO_TICKS(60'000));
