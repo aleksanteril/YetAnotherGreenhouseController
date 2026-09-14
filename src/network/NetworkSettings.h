@@ -3,14 +3,20 @@
 
 #define THINGSPEAK_HOST "api.thingspeak.com"
 
+#include "../secret.h"
+
 struct NetworkSettings {
-    char ssid[64]          = "";
-    char password[64]      = "";
+    // MAcros from secret.h
+
+    char ssid[64]          = WIFI_SSID;
+    char password[64]      = WIFI_PASSWORD;
 
     // ThingSpeak keys
-    char api_key[24]       = "1WWH2NWXSM53URR5";   // channel write key (/update.json)
-    int  talkback_id       = 52920;
-    char talkback_key[24]  = "371DAWENQKI6J8DD";   // TalkBack queue key
+    char api_key[24]       = TS_API_KEY;
+    int  talkback_id       = TS_TALCKBACK_ID;
+    char talkback_key[24]  = TS_TALCKBACK_KEY;
+
+    char server_ip[32]     = TS_SERVER_IP;
 
     int send_interval_ms   = 16000;
 

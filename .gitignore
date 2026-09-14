@@ -4,3 +4,4 @@ build
 .idea
 .vscode
 .clang-tidy
+.secret.h

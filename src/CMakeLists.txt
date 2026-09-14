@@ -16,8 +16,8 @@ add_executable(${ProjectName}
         shell/shell.cpp
         shell/shell.hpp
 
-#        ipstack/IPStack.cpp
-#        ipstack/IPStack.h
+        ipstack/IPStack.cpp
+        ipstack/IPStack.h
         ipstack/lwipopts.h
         ipstack/tls_common.c
         ipstack/picow_tls_client.c
@@ -37,10 +37,12 @@ add_executable(${ProjectName}
         modbus/ModbusClient.cpp
         modbus/ModbusClient.h
 
-        network/network.cpp
-        Network/NetworkSettings.h
-        Network/ThingSpeakClient.cpp
-        Network/ThingSpeakClient.h
+        network/NetworkSettings.h
+        network/SharedData.h
+        network/NetworkTask.cpp
+        network/NetworkTask.h
+        network/ThingSpeakClient.cpp
+        network/ThingSpeakClient.h
 
         display/framebuf.cpp
         display/framebuf.h
@@ -52,6 +54,7 @@ add_executable(${ProjectName}
         display/ssd1306os.cpp
         display/ui_display.hpp
         display/ui_display.cpp
+        network/NetworkSettings.h
 )
 
 target_include_directories(${ProjectName} PRIVATE
@@ -64,6 +67,7 @@ target_include_directories(${ProjectName} PRIVATE
         utilities
         lansk
         shell
+        network
 )
 
 target_compile_definitions(${ProjectName} PRIVATE

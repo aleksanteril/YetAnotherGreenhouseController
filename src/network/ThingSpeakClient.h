@@ -3,10 +3,12 @@
 
 #include "NetworkSettings.h"
 #include "SharedData.h"
+#include "IPStack.h"
 
 class ThingSpeakClient {
 public:
-    ThingSpeakClient(const NetworkSettings &settings, const char *server_ip, int port = 80);
+    ThingSpeakClient(IPStack &ipstack, const NetworkSettings &settings,
+                     const char *server_ip, int port = 80);
 
     // Returns true if the server replied
     bool send_update(const GreenhouseData &data);
@@ -29,6 +31,7 @@ private:
     // Locate the response body
     static const char *http_body(const char *response);
 
+    IPStack &ip;
     const NetworkSettings &cfg;
     char server_ip[32];
     int  port;

@@ -1,5 +1,6 @@
 #include "NetworkTask.h"
 #include "ThingSpeakClient.h"
+#include "IPStack.h"
 
 #include "FreeRTOS.h"
 #include "task.h"
@@ -42,9 +43,11 @@ void network_task(void *param) {
     SharedData *shared = p->shared;
     const NetworkSettings &cfg = p->settings;
 
-    printf("[Network] starting. SSID=%s server=%s interval=%dms\n", cfg.ssid, p->server_ip, cfg.send_interval_ms);
+    printf("[Network] starting. SSID=%s server=%s interval=%dms\n", cfg.ssid, cfg.server_ip, cfg.send_interval_ms);
 
-    ThingSpeakClient client(cfg, p->server_ip, 80);
+
+    static IPStack ipstack(cfg.ssid, cfg.password);
+    ThingSpeakClient client(ipstack, cfg, cfg.server_ip, 80);
     TickType_t last_send = xTaskGetTickCount() - pdMS_TO_TICKS(cfg.send_interval_ms);
 
     while (true) {
@@ -73,7 +76,6 @@ void network_task(void *param) {
                 if (parse_setpoint_command(cmd, &new_sp)) {
                     shared->set_setpoint(new_sp);
                     printf("[Network] remote setpoint applied: %.0f ppm\n", new_sp);
-                    // todo setpoint to eeprom here
                 } else {
                     printf("[Network] invalid command\n");
                 }

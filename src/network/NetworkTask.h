@@ -11,7 +11,6 @@
 struct NetworkTaskParams {
     SharedData      *shared;    // shared measurements + setpoint
     NetworkSettings  settings;  // connection parameters (copied by value)
-    const char      *server_ip; // dotted-decimal IP for api.thingspeak.com
 };
 
 void network_task(void *param);

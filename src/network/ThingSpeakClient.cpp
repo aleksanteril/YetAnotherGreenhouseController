@@ -8,8 +8,8 @@
 // Response buffer for ThingSpeak's replies and headers.
 #define RESP_BUF_SIZE  1024
 
-ThingSpeakClient::ThingSpeakClient(const NetworkSettings &settings, const char *server_ip, const int port)
-                                  : cfg(settings), port(port) {
+ThingSpeakClient::ThingSpeakClient(IPStack &ipstack, const NetworkSettings &settings, const char *server_ip, const int port)
+                                  : ip(ipstack), cfg(settings), port(port) {
     set_server_ip(server_ip);
 }
 
@@ -21,8 +21,6 @@ void ThingSpeakClient::set_server_ip(const char *ip) {
 }
 
 int ThingSpeakClient::exchange(const char *request, char *resp_buf, int resp_buf_size) {
-    IPStack ip(cfg.ssid, cfg.password);
-
     int rc = ip.connect(server_ip, port);
     if (rc != 0) {
         printf("ThingSpeak TCP connect to %s:%d failed rc=%d\n", server_ip, port, rc);
@@ -37,7 +35,7 @@ int ThingSpeakClient::exchange(const char *request, char *resp_buf, int resp_buf
         return -2;
     }
 
-    int total = ip.read((unsigned char *)resp_buf, resp_buf_size - 1, 2000);
+    int total = ip.read((unsigned char *)resp_buf, resp_buf_size - 1, 5000);
     if (total < 0) {
         total = 0;
     }
@@ -79,7 +77,6 @@ const char *ThingSpeakClient::http_body(const char *response) {
 }
 
 bool ThingSpeakClient::send_update(const GreenhouseData &data) {
-    // Build the form body first so we can set Content-Length correctly.
     // field1=CO2, field2=RH, field3=Temp, field4=Fan%, field5=Setpoint
     char body[256];
     const int body_len = snprintf(

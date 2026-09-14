@@ -7,11 +7,17 @@
 
 #include "shell.hpp"
 #include "ui_display.hpp"
+#include "NetworkTask.h"
+#include "SharedData.h"
 
 void
 shell_task(void* param);
 void
 ui_task(void* param);
+
+// All connection parameters come from the NetworkSettings (+secret.h).
+static SharedData        g_shared;
+static NetworkTaskParams g_net_params{ &g_shared, NetworkSettings{} };
 
 int 
 main()
@@ -22,10 +28,12 @@ main()
         // Only device @ 0x50 on i2c0
         static EEPROM e;
 
-        xTaskCreate(shell_task, "SHELL", 
+        xTaskCreate(shell_task, "SHELL",
                 312, (void*)&e, tskIDLE_PRIORITY + 1, NULL);
         xTaskCreate(ui_task, "UI", 
                 512, (void*)&e, tskIDLE_PRIORITY + 1, NULL);
+        xTaskCreate(network_task, "NETWORK",
+                2048, (void*)&g_net_params, tskIDLE_PRIORITY + 1, NULL);
 
         printf("Start FreeRTOS scheduler\n");
         vTaskStartScheduler();
