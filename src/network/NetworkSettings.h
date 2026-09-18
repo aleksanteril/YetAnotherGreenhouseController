@@ -8,8 +8,8 @@
 struct ThingSpeakConfig {
     // MAcros from secret.h
 
-    const char* ssid          = WIFI_SSID;
-    const char* password      = WIFI_PASSWORD;
+    const char* ssid;          //= WIFI_SSID;
+    const char* password;      //= WIFI_PASSWORD;
 
     // ThingSpeak keys
     const char* api_key      = TS_API_KEY;
