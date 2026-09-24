@@ -125,7 +125,7 @@ controller_task(void* param)
                 pid_valve.loop(co2);
                 if(fan_enable || co2 >= CO2_HLIMIT) {
                         pid_fan.loop(co2);
-                        fan_enable = (co2 >= sp);
+                        fan_enable = (co2 > sp);
                 }
                 xQueueSend(Display::Event_q, &updt, 0);
         }
