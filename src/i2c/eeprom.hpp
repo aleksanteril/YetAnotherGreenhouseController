@@ -9,7 +9,7 @@
 
 #include "secret.h"
 
-namespace EEPROMCache
+namespace Cache
 {
         constexpr uint16_t DEFAULT_SETPOINT{ 1000 };
         extern QueueHandle_t setpoint_mb;
@@ -17,10 +17,12 @@ namespace EEPROMCache
         struct NetworkSetting_t {
                 char ssid[33];
                 char pwd[64];
+                uint16_t crc;
         };
-        constexpr EEPROMCache::NetworkSetting_t DEFAULT_NETWORK {
+        constexpr NetworkSetting_t DEFAULT_NETWORK {
                 .ssid = WIFI_SSID,
-                .pwd = WIFI_PASSWORD
+                .pwd = WIFI_PASSWORD,
+                .crc = 0
         };
         extern QueueHandle_t network_mb;
 }
@@ -34,6 +36,10 @@ class EEPROM : private PicoI2C {
                 save_setpoint(uint16_t setpoint);
                 bool
                 load_setpoint(uint16_t& setpoint);
+                bool
+                save_network(Cache::NetworkSetting_t& packet);
+                bool
+                load_network(Cache::NetworkSetting_t& packet);
 
         private:
                 const uint8_t dev_addr;
@@ -45,6 +51,8 @@ class EEPROM : private PicoI2C {
                 // True on success
                 bool 
                 write_page(uint16_t addr, uint8_t* bytes, size_t len);
+                void
+                xor_encrypt(uint8_t* bytes, size_t len, uint8_t key);
 };
 
 #endif
