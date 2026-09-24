@@ -11,8 +11,8 @@ namespace Sensors
         struct SensorPacket_t {
                 TickType_t timestamp;
                 union {
-                        double doubl;
-                        uint16_t uint16;
+                        double f64;
+                        uint16_t u16;
                 };
         };
 

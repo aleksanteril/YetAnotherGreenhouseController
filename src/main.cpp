@@ -25,14 +25,23 @@ ui_task(void* param);
 void
 network_task(void* param);
 
-int 
-main()
+void
+startup_task(void* param)
 {
-        stdio_init_all();
-        printf("\nBoot\n");
-        
+        // this task is needed as eeprom i2c dependant libraries cant be called
+        // outside of the scheduler running.
+
         // Only device @ 0x50 on i2c0
-        static EEPROM e;
+        // constructor fills EEPROMCache mb's with default values
+        static EEPROM e; 
+        {
+                uint16_t dummy;
+                e.load_setpoint(dummy);
+        }
+        {
+                Cache::NetworkSetting_t dummy;
+                e.load_network(dummy);
+        }
 
         xTaskCreate(shell_task, "SHELL",
                 392, (void*)&e, tskIDLE_PRIORITY + 1, nullptr);
@@ -42,6 +51,18 @@ main()
                 256, (void*)&e, tskIDLE_PRIORITY + 2, nullptr);
         xTaskCreate(network_task, "NETWORK",
                 2048, nullptr, tskIDLE_PRIORITY + 1, NULL);
+
+        vTaskDelete(nullptr);
+}
+
+int 
+main()
+{
+        stdio_init_all();
+        printf("\nBoot\n");
+
+        xTaskCreate(startup_task, "STARTUP",
+                512, nullptr, tskIDLE_PRIORITY + 1, nullptr);
 
         printf("Start FreeRTOS scheduler\n");
         vTaskStartScheduler();
@@ -83,20 +104,29 @@ controller_task(void* param)
         GMP252 gmp(rtu);
         PRODUAL fan(rtu);
         CO2_Valve valve;
-        P_Controller pid_fan(fan, 2000, 2, false);
+
         int sp{};
-        xQueuePeek(EEPROMCache::setpoint_mb, &sp, 0);
+        xQueuePeek(Cache::setpoint_mb, &sp, 0);
         P_Controller pid_valve(valve, sp, 0.1);
+        bool fan_enable{};
+        P_Controller pid_fan(fan, sp, 2, false);
 
         Display::Event updt{ Display::UPDATE };
         for(;;) {
                 vTaskDelay(pdMS_TO_TICKS(2000));
                 int new_sp{};
-                xQueuePeek(EEPROMCache::setpoint_mb, &new_sp, 0);
-                sp = (new_sp != sp) ? (pid_valve.sp = new_sp) : sp;
-                uint16_t co2_value{ gmp.read_co2() };
-                pid_valve.loop(co2_value);
-                pid_fan.loop(co2_value);
+                xQueuePeek(Cache::setpoint_mb, &new_sp, 0);
+                if(new_sp != sp) {
+                        pid_valve.sp = new_sp;
+                        pid_fan.sp = new_sp;
+                        sp = new_sp;
+                }
+                uint16_t co2{ gmp.read_co2() };
+                pid_valve.loop(co2);
+                if(fan_enable || co2 >= CO2_HLIMIT) {
+                        pid_fan.loop(co2);
+                        fan_enable = (co2 >= sp);
+                }
                 xQueueSend(Display::Event_q, &updt, 0);
         }
 }
@@ -113,15 +143,8 @@ ui_task(void* param)
 
 void
 shell_task(void* param)
-{       
-        // hack, 
-        // make shell responsible for loading setpoint from EEPROM if possible
-        // this is due to the i2c library functions not working in main 
-        // (outside of tasks etc.)
-        auto* e{ (EEPROM*)param };
-        uint16_t dummy;
-        e->load_setpoint(dummy);
-        Shell sh(*e);
+{      
+        Shell sh(*(EEPROM*)param);
         for(;;) {
                 // Task sleeps until activity starts on UART0
                 sh.loop();
@@ -130,8 +153,8 @@ shell_task(void* param)
 
 void network_task(void *param) {
 
-        EEPROMCache::NetworkSetting_t wlan;
-        xQueuePeek(EEPROMCache::network_mb, &wlan, portMAX_DELAY);
+        Cache::NetworkSetting_t wlan;
+        xQueuePeek(Cache::network_mb, &wlan, portMAX_DELAY);
         IPStack ipstack(wlan.ssid, wlan.pwd);
 
         ThingSpeakConfig cfg {
@@ -147,12 +170,12 @@ void network_task(void *param) {
                 ThingSpeakPacket data;
                 Sensors::SensorPacket_t packet;
                 xQueuePeek(Sensors::co2_mb, &packet, 0);
-                data.co2_ppm = packet.uint16;
+                data.co2_ppm = packet.u16;
                 xQueuePeek(Sensors::temp_mb, &packet, 0);
-                data.temperature = packet.doubl;
+                data.temperature = packet.f64;
                 xQueuePeek(Sensors::rh_mb, &packet, 0);
-                data.humidity = packet.doubl;
-                xQueuePeek(EEPROMCache::setpoint_mb, &data.setpoint_ppm, 0);
+                data.humidity = packet.f64;
+                xQueuePeek(Cache::setpoint_mb, &data.setpoint_ppm, 0);
                 data.fan_percent = 0; // right now unused
 
                 // Push measurements to the cloud.

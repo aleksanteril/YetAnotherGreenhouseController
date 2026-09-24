@@ -26,7 +26,7 @@ HMP60::read_rh()
         double val{ (rh.read() / 10.0) }; 
         Sensors::SensorPacket_t packet{
                 .timestamp = xTaskGetTickCount(),
-                .doubl = val
+                .f64 = val
         };
         xQueueOverwrite(rh_mb, (void*)&packet);
         return val;
@@ -37,7 +37,7 @@ HMP60::read_temp()
         double val{ (temp.read() / 10.0) }; 
         Sensors::SensorPacket_t packet{
                 .timestamp = xTaskGetTickCount(),
-                .doubl = val
+                .f64 = val
         };
         xQueueOverwrite(temp_mb, (void*)&packet);
         return val;
@@ -58,7 +58,7 @@ GMP252::read_co2()
         uint16_t val{ co2.read() };
         Sensors::SensorPacket_t packet{
                 .timestamp = xTaskGetTickCount(),
-                .uint16 = val
+                .u16 = val
         };
         xQueueOverwrite(co2_mb, (void*)&packet);
         return val;
@@ -103,7 +103,7 @@ PRODUAL::write_speed(uint16_t val)
         if(!running && val > 0) {
                 // kickstart to run
                 speed.write(600);
-                vTaskDelay(pdMS_TO_TICKS(10));
+                vTaskDelay(pdMS_TO_TICKS(40));
                 running = true;
         } else if(running && val <= 0) {
                 speed.write(0);
@@ -117,12 +117,12 @@ PRODUAL::write_speed(uint16_t val)
 void
 PRODUAL::set_output(int percent)
 {
-        if(percent < 0) {
+        if(percent <= 0) {
                 percent = 0;
-        } else if(percent < 20) {
+        } else if(percent <= 20) {
                 // minimum speed to turn the fan
                 percent = 20;
-        } else if(percent > 100) {
+        } else if(percent >= 100) {
                 percent = 100;
         }
         write_speed(percent*10);
@@ -173,10 +173,10 @@ CO2_Valve::set_output(int percent)
                 //close();
                 return;
         } 
-        if(percent < 10) {
+        if(percent <= 10) {
                 // min 1s of co2
                 percent = 10;
-        } else if(percent > 30) {
+        } else if(percent >= 30) {
                 // max 3s of co2
                 percent = 30;
         }

@@ -274,13 +274,13 @@ handle_draw_sensors(ssd1306os& display)
 {
         Sensors::SensorPacket_t packet;
         xQueuePeek(Sensors::co2_mb, &packet, 0);
-        uint16_t co2{ packet.uint16 };
+        uint16_t co2{ packet.u16 };
         xQueuePeek(Sensors::rh_mb, &packet, 0);
-        double rh{ packet.doubl };
+        double rh{ packet.f64 };
         xQueuePeek(Sensors::temp_mb, &packet, 0);
-        double temp{ packet.doubl };
+        double temp{ packet.f64 };
         uint16_t sp{};
-        xQueuePeek(EEPROMCache::setpoint_mb, &sp, 0);
+        xQueuePeek(Cache::setpoint_mb, &sp, 0);
 
         display.fill(0);
         std::array<char, 32> buf;
