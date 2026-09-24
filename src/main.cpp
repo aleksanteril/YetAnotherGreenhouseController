@@ -110,7 +110,6 @@ controller_task(void* param)
         P_Controller pid_valve(valve, sp, 0.1);
         bool fan_enable{};
         P_Controller pid_fan(fan, sp, 2, false);
-
         Display::Event updt{ Display::UPDATE };
         for(;;) {
                 vTaskDelay(pdMS_TO_TICKS(2000));

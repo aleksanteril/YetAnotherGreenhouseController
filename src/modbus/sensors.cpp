@@ -70,6 +70,7 @@ constexpr uint PRODUAL_ADDR{ 1 };
 PRODUAL::PRODUAL(std::shared_ptr<ModbusClient> client_)
 : counter(client_, PRODUAL_ADDR, 4, false), speed(client_, PRODUAL_ADDR, 0) 
 {
+        set_output(0);
 }
 
 int
@@ -84,30 +85,20 @@ PRODUAL::read_speed()
         return (speed.read() / 10.0); 
 }
 
-bool
-PRODUAL::watchdog()
-{
-        if(running) {
-                //set running and counter comes back 0 fail
-                return (bool)read_counter();
-        } else {
-                //not running just ignore
-                return true;
-        }
-}
-
 // 0 - 1000
 void
 PRODUAL::write_speed(uint16_t val) 
 { 
+        // read watchdog
+        running = (bool)read_counter();
         if(!running && val > 0) {
                 // kickstart to run
                 speed.write(600);
-                vTaskDelay(pdMS_TO_TICKS(40));
-                running = true;
+                vTaskDelay(pdMS_TO_TICKS(30));
+                running = (bool)read_counter();
         } else if(running && val <= 0) {
                 speed.write(0);
-                running = false;
+                running = (bool)read_counter();
         }
         if(running) {
                 speed.write(val > 1000 ? 1000 : val);
@@ -144,11 +135,10 @@ CO2_Valve::CO2_Valve()
 {
         gpio_init(pin);
         gpio_set_dir(pin, GPIO_OUT);
-        gpio_put(pin, false);
-
         gpio_init(led_pin);
         gpio_set_dir(led_pin, GPIO_OUT);
-        gpio_put(led_pin, false);
+        close();
+        set_output(0);
 }
 
 void 

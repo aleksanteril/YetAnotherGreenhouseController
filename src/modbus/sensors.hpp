@@ -63,8 +63,6 @@ class PRODUAL {
         write_speed(uint16_t val);
         void
         set_output(int percent);
-        bool
-        watchdog();
 
       private:
         bool running{ false };
