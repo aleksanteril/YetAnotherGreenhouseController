@@ -76,9 +76,9 @@ Shell::print_usage()
 {
         constexpr const char* msg{
                 "Options:\r\n"
-                "             help:   - print this help\r\n"
                 "             info:   - print current saved settings\r\n"
-                "     target <ppm>:   - set co2 ppm level (0 - 1500)\r\n" 
+                "            reset:   - reset to factory defaults\r\n" 
+                "     target <ppm>:   - set co2 ppm level (0 - 1500)\r\n"
                 "wlan \"ssid\" \"pwd\":   - set wlan connection settings\r\n" };
         u.send(msg);
 }
@@ -87,7 +87,8 @@ void
 Shell::print_settings()
 {
         uint16_t setpoint{};
-        if(!e.load_setpoint(setpoint)) {
+        Cache::NetworkSetting_t wlan;
+        if(!e.load_setpoint(setpoint) || !e.load_network(wlan)) {
                 constexpr const char* fail{ 
                         "Failed to load settings\r\n" };
                 u.send(fail);
@@ -96,7 +97,8 @@ Shell::print_settings()
         // Convert IPv4 to decimal notation
         std::array<char, 64> msg;
         snprintf(msg.data(), msg.size(), 
-                "- CO2 Setpoint: %u ppm\r\n", setpoint);
+                "- CO2 Setpoint: %u ppm\r\n"
+                "- Network SSID: %s\r\n", setpoint, wlan.ssid);
         u.send(msg.data());
 }
 
@@ -199,6 +201,12 @@ Shell::parse_cmd()
                         // tcp-pcb panic errors :(
                         watchdog_reboot(0, 0, 1000);
                 }
+        } else if(cmd.starts_with("reset")) {
+                e.save_setpoint(Cache::DEFAULT_SETPOINT);
+                auto packet{ Cache::DEFAULT_NETWORK };
+                e.save_network(packet);
+                // this is needed as above ranted.
+                watchdog_reboot(0, 0, 1000);
         } else {
                 constexpr const char* msg{ "Unknown command, try help\r\n" };
                 u.send(msg);
