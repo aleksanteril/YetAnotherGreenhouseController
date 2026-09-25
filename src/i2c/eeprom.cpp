@@ -67,40 +67,30 @@ EEPROM::save_network(Cache::NetworkSetting_t& packet)
 {
         //  crc16 + ssid + pwd
         // saved on 2 sections
-        uint8_t buf[2+33+64];
-        memcpy(buf+2, packet.ssid, 33);
-        memcpy(buf+2+33, packet.pwd, 64);
-        packet.crc = crc16(buf+2, 33+64);
+        uint8_t* p_ptr = (uint8_t*)&packet;
+        packet.crc = crc16(p_ptr+2, 33+64);
         xQueueOverwrite(Cache::network_mb, (void*)&packet);
-        buf[0] = (uint8_t)(packet.crc >> 8U);
-        buf[1] = (uint8_t)packet.crc;
-        xor_encrypt(buf, 2+33+64, KEY);
-        if(!write_page(SSID_ADDR, buf, 2+33)) {
+        xor_encrypt(p_ptr, 2+33+64, KEY);
+        if(!write_page(SSID_ADDR, p_ptr, 2+33)) {
                 return false;
         }
-        return write_page(PWD_ADDR, buf+2+33, 64);
+        return write_page(PWD_ADDR, p_ptr+2+33, 64);
 }
 
 bool
 EEPROM::load_network(Cache::NetworkSetting_t& packet)
 {
-        uint8_t buf[2+33+64+2];
-        if(!read_page(SSID_ADDR, buf, 2+33)) {
+        uint8_t* p_ptr = (uint8_t*)&packet;
+        if(!read_page(SSID_ADDR, p_ptr, 2+33)) {
                 return false;
         }
-        if(!read_page(PWD_ADDR, buf+2+33, 64)) {
+        if(!read_page(PWD_ADDR, p_ptr+2+33, 64)) {
                 return false;
         }
-        xor_encrypt(buf, 2+33+64, KEY);
-        // crc16 function requires the crc appended so this dirty crap will do
-        buf[2+33+64] = buf[0];
-        buf[2+33+64+1] = buf[1];
-        if(crc16(buf+2, 33+64+2) != 0) {
+        xor_encrypt(p_ptr, 2+33+64, KEY);
+        if(crc16(p_ptr+2, 33+64) != packet.crc) {
                 return false;
         }
-        packet.crc = ((uint16_t)buf[0] << 8U) | buf[1];
-        memcpy(packet.ssid, buf+2, 33);
-        memcpy(packet.pwd, buf+2+33, 64);
         xQueueOverwrite(Cache::network_mb, (void*)&packet);
         return true;
 }

@@ -15,14 +15,14 @@ namespace Cache
         extern QueueHandle_t setpoint_mb;
 
         struct NetworkSetting_t {
+                uint16_t crc;
                 char ssid[33];
                 char pwd[64];
-                uint16_t crc;
         };
         constexpr NetworkSetting_t DEFAULT_NETWORK {
+                .crc = 0,
                 .ssid = WIFI_SSID,
-                .pwd = WIFI_PASSWORD,
-                .crc = 0
+                .pwd = WIFI_PASSWORD
         };
         extern QueueHandle_t network_mb;
 }
