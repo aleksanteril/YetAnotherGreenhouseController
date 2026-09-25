@@ -121,10 +121,16 @@ controller_task(void* param)
                         sp = new_sp;
                 }
                 uint16_t co2{ gmp.read_co2() };
-                pid_valve.loop(co2);
-                if(fan_enable || co2 >= CO2_HLIMIT) {
-                        pid_fan.loop(co2);
-                        fan_enable = (co2 > sp);
+                if(co2 == 0) {
+                        // co2 value 0 indicates error
+                        // go into error state, dont run valve, fan on?.
+                        valve.set_output(0);
+                } else {
+                        pid_valve.loop(co2);
+                        if(fan_enable || co2 >= CO2_HLIMIT) {
+                                pid_fan.loop(co2);
+                                fan_enable = (co2 > sp);
+                        }
                 }
                 xQueueSend(Display::Event_q, &updt, 0);
         }
