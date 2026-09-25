@@ -69,6 +69,7 @@ EEPROM::save_network(Cache::NetworkSetting_t& packet)
         // saved on 2 sections
         uint8_t* p_ptr = (uint8_t*)&packet;
         packet.crc = crc16(p_ptr+2, 33+64);
+        packet.timestamp = xTaskGetTickCount();
         xQueueOverwrite(Cache::network_mb, (void*)&packet);
         xor_encrypt(p_ptr, 2+33+64, KEY);
         if(!write_page(SSID_ADDR, p_ptr, 2+33)) {
@@ -91,6 +92,7 @@ EEPROM::load_network(Cache::NetworkSetting_t& packet)
         if(crc16(p_ptr+2, 33+64) != packet.crc) {
                 return false;
         }
+        packet.timestamp = xTaskGetTickCount();
         xQueueOverwrite(Cache::network_mb, (void*)&packet);
         return true;
 }

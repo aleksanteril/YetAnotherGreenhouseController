@@ -22,9 +22,8 @@ public:
 
     bool parse_setpoint(const char *cmd, int *out_setpoint);
 
-    // reconnect to wifi, or change current wifi to new one
+    // reconnect to wifi
     bool reconnect();
-    bool reconnect(const char* ssid, const char* pwd);
 
 private:
     // Perform one request/response exchange

@@ -186,7 +186,9 @@ void network_task(void *param) {
                 // Push measurements to the cloud.
                 if (!client.send_update(data)) {
                         // try to reconnect
-                        while(!client.reconnect()) {
+                        for(int tries{}; tries < 5; ++tries) {
+                                if (client.reconnect())
+                                        break;
                                 // retry every 1 min
                                 vTaskDelay(pdMS_TO_TICKS(60'000));
                         }

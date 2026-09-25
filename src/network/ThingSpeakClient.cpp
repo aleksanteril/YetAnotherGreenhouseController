@@ -17,6 +17,7 @@ ThingSpeakClient::ThingSpeakClient(IPStack &ipstack, ThingSpeakConfig &settings,
 int ThingSpeakClient::exchange(const char *request, char *resp_buf, int resp_buf_size) {
     int rc = ip.connect(server_ip, port);
     if (rc != 0) {
+        ip.disconnect();
         return -1;
     }
 
@@ -208,20 +209,14 @@ ThingSpeakClient::parse_setpoint(const char *cmd, int *out_setpoint)
 bool
 ThingSpeakClient::reconnect() 
 {
-        bool ok{};
         // probe dns server to see we are on wifi
         if(ip.connect("8.8.8.8", 53) != 0) {
                 // we arent on the internet
-                ok = ip.reconnect_wifi(cfg.ssid, cfg.password) == 0;
+                ip.disconnect();
+                return ip.reconnect_wifi(cfg.ssid, cfg.password) == 0;
+        } else {
+                // wifi is ok.
+                ip.disconnect();
+                return true;
         }
-        ip.disconnect();
-        return ok;
-}
-
-bool
-ThingSpeakClient::reconnect(const char* ssid, const char* pwd)
-{
-        cfg.ssid = ssid;
-        cfg.password = pwd;
-        return ip.reconnect_wifi(ssid, pwd) == 0;
 }

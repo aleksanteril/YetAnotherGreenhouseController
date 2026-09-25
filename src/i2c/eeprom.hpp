@@ -18,11 +18,13 @@ namespace Cache
                 uint16_t crc;
                 char ssid[33];
                 char pwd[64];
+                TickType_t timestamp;
         };
         constexpr NetworkSetting_t DEFAULT_NETWORK {
                 .crc = 0,
                 .ssid = WIFI_SSID,
-                .pwd = WIFI_PASSWORD
+                .pwd = WIFI_PASSWORD,
+                .timestamp = 0
         };
         extern QueueHandle_t network_mb;
 }
