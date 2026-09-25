@@ -6,11 +6,23 @@
 
 constexpr int INACTIVE{ -1 };
 
+bool
+unallowed_ascii(uint8_t* ptr) {
+        uint8_t ch{ *ptr };
+        bool res{};
+        if(ch >= 128 || ch <= 255) {
+                // allow nordics etc, extended ascii
+                return false;
+        }
+        return (ch < 32 || ch > 127);
+}
+
 static inline std::optional<int>
 parse_setpoint(std::string_view& cmd)
 {
         int setpoint{};
-        if(sscanf(cmd.data(), "%d", &setpoint) != 1) {
+        char extra{};
+        if(sscanf(cmd.data(), "%d %c", &setpoint, &extra) != 1) {
                 return std::nullopt;
         }
         if(setpoint > MAX_CO2_SP || setpoint < 0) {
@@ -19,6 +31,17 @@ parse_setpoint(std::string_view& cmd)
         return setpoint;
 }
 
+static inline std::optional<Cache::NetworkSetting_t>
+parse_wlan(std::string_view& cmd)
+{
+        Cache::NetworkSetting_t packet;
+        char extra{};
+        if(sscanf(cmd.data(), "\"%32[^\"]\" \"%63[^\"]\" %c", 
+           &packet.ssid, &packet.pwd, &extra) != 2) {
+                return std::nullopt;
+        }
+        return packet;
+}
 
 constexpr uint UART0_TX_PIN{ 0 };
 constexpr uint UART0_RX_PIN{ 1 };
@@ -51,9 +74,10 @@ Shell::print_usage()
 {
         constexpr const char* msg{
                 "Options:\r\n"
-                "                help:   - print this help\r\n"
-                "                info:   - print current saved settings\r\n"
-                "    set target <ppm>:   - set co2 ppm level (0 - 1500)\r\n" };
+                "             help:   - print this help\r\n"
+                "             info:   - print current saved settings\r\n"
+                "     target <ppm>:   - set co2 ppm level (0 - 1500)\r\n" 
+                "wlan \"ssid\" \"pwd\":   - set wlan connection settings\r\n" };
         u.send(msg);
 }
 
@@ -92,13 +116,13 @@ Shell::read_chars(bool& skip_read)
         // Parse char
         switch(*ptr) {
         default:
-                if(*ptr < 32 || *ptr > 127) {
+                if(unallowed_ascii(ptr)) {
                         // destroy potential ansi sequences other garbage etc
                         uint8_t dummy;
                         while(u.read(&dummy, 1, 0));
                         return 1;
                 }
-                if (ptr < buf.end()-1) {
+                if(ptr < buf.end()-1) {
                         // Writing pointer in limits end() - 1
                         // The last place in buffer is dummy char for read()
                         u.write(ptr++, 1, 0);
@@ -106,7 +130,7 @@ Shell::read_chars(bool& skip_read)
                 return 1;
         case '\x7f': // DEL
         case '\b':
-                if (ptr-1 >= buf.data()) {
+                if(ptr-1 >= buf.data()) {
                         // Clear, backspace - clear - backspace
                         constexpr const char* clear{ "\b \b" };
                         u.write((uint8_t*)clear, 3, 0);
@@ -144,18 +168,28 @@ Shell::parse_cmd()
         constexpr const char* fail_save{ "Local value set.\r\n"
                                          "EEPROM Save failed.\r\n" };
         //Parse command
-        if(cmd == "help") {
+        if(cmd == "help" || cmd == "?") {
                 print_usage();
-        } else if (cmd == "info") {
+        } else if(cmd == "info") {
                 print_settings();
-        } else if (cmd.starts_with("set target ")) {
-                cmd.remove_prefix(sizeof("set target ")-1);
+        } else if(cmd.starts_with("target ")) {
+                cmd.remove_prefix(sizeof("target ")-1);
                 auto setpoint{ parse_setpoint(cmd) };
                 if(!setpoint) {
                         u.send(fail_parse);
                         return;
                 }
                 if (!e.save_setpoint(*setpoint)) {
+                        u.send(fail_save);
+                }
+        } else if(cmd.starts_with("wlan ")) {
+                cmd.remove_prefix(sizeof("wlan ")-1);
+                auto wlan{ parse_wlan(cmd) };
+                if(!wlan) {
+                        u.send(fail_parse);
+                        return;    
+                }
+                if (!e.save_network(*wlan)) {
                         u.send(fail_save);
                 }
         } else {
