@@ -94,7 +94,7 @@ PRODUAL::write_speed(uint16_t val)
         if(!running && val > 0) {
                 // kickstart to run
                 speed.write(600);
-                vTaskDelay(pdMS_TO_TICKS(30));
+                vTaskDelay(pdMS_TO_TICKS(250));
                 running = (bool)read_counter();
         } else if(running && val <= 0) {
                 speed.write(0);

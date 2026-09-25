@@ -125,6 +125,7 @@ controller_task(void* param)
                         // co2 value 0 indicates error
                         // go into error state, dont run valve, fan on?.
                         valve.set_output(0);
+                        fan.set_output(0);
                 } else {
                         pid_valve.loop(co2);
                         if(fan_enable || co2 >= CO2_HLIMIT) {
