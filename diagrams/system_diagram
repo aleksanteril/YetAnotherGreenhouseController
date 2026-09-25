@@ -1,0 +1,262 @@
+@startuml
+!theme reddress-lightgreen
+
+title CO2 Controller - FreeRTOS System Diagram
+
+top to bottom direction
+
+skinparam shadowing false
+skinparam nodesep 45
+skinparam ranksep 58
+skinparam defaultTextAlignment left
+skinparam ArrowThickness 1
+skinparam RectangleRoundCorner 8
+
+skinparam rectangle {
+    BorderColor #666666
+    FontColor #222222
+    BackgroundColor #EDEDED
+
+    BackgroundColor<<task>> #DCEBFA
+    BackgroundColor<<hw>> #DFF3E3
+    BackgroundColor<<service>> #E7EFEF
+    BackgroundColor<<timer>> #FFE0B2
+    BackgroundColor<<isr>> #F8DDDD
+    BackgroundColor<<sync>> #ECE4F7
+}
+
+skinparam queue {
+    BorderColor #666666
+    FontColor #222222
+    BackgroundColor #FFF6CC
+}
+
+skinparam package {
+    BorderColor #888888
+    FontColor #222222
+    BackgroundColor #FFFFFF
+}
+
+skinparam legend {
+    BackgroundColor #FFFFFF
+    BorderColor #666666
+    FontColor #222222
+}
+
+
+' ============================================================
+' freertos timers
+' ============================================================
+
+package "FreeRTOS Timers" as TIMERS {
+
+    rectangle "CO2 Valve Timer\n\n- 30 s periodic\n- started by Controller" as VALVE_TIMER <<timer>>
+
+    rectangle "UI Inactivity Timer\n\n- 15 s one-shot\n- reset by UI activity" as UI_TIMER <<timer>>
+
+    VALVE_TIMER -[hidden]right-> UI_TIMER
+}
+
+
+' ============================================================
+' freertos ipc / synchronization
+' ============================================================
+
+package "FreeRTOS IPC / Synchronization" as IPC {
+
+    queue "setpoint_mb\nqueue length 1\n\nwriter: EEPROM\nreaders: Controller, UI, Network" as SETPOINT_MB
+
+    queue "network_mb\nqueue length 1\n\nwriter: EEPROM\nreader: Network" as NETWORK_MB
+
+    rectangle "Button event group\n\ncontrolled by UI\nwaited by Button Tasks" as BUTTON_EG <<sync>>
+
+    queue "DisplayEvent_q\nFreeRTOS queue\n\nproducers: Temp/RH, Controller,\nButtons, Rotary ISR, UI timer\nconsumer: UI" as DISPLAY_Q
+
+    queue "Sensor mailboxes\n\ntemp_mb, rh_mb, co2_mb\nqueue length 1 each\n\nwriters: Temp/RH, Controller\nreaders: UI, Network" as SENSOR_MB
+
+    rectangle "EEPROM event group\n\nread / write synchronization\nused internally by EEPROM" as EEPROM_EG <<sync>>
+
+    SETPOINT_MB -[hidden]right-> NETWORK_MB
+    NETWORK_MB -[hidden]right-> BUTTON_EG
+    BUTTON_EG -[hidden]right-> DISPLAY_Q
+    DISPLAY_Q -[hidden]right-> SENSOR_MB
+    SENSOR_MB -[hidden]right-> EEPROM_EG
+}
+
+
+' ============================================================
+' isrs
+' ============================================================
+
+package "ISRs" as ISRS {
+
+    rectangle "Rotary Encoder ISR" as ROT_ISR <<isr>>
+
+    rectangle "Valve Alarm ISR" as VALVE_ISR <<isr>>
+
+    ROT_ISR -[hidden]right-> VALVE_ISR
+}
+
+
+' ============================================================
+' application tasks
+' ============================================================
+
+package "Application Tasks" as TASKS {
+
+    rectangle "Controller Task\n\n- reads CO2 and setpoint\n- PID / control logic\n- controls fan and valve timing" as CTRL_TASK <<task>>
+
+    rectangle "Network Task\n\n- Wi-Fi / ThingSpeak\n- sends measurements" as NETWORK_TASK <<task>>
+
+    rectangle "Button Tasks (2)\n\n- SW0 and SW2\n- poll push buttons\n- send UI events" as BUTTON_TASKS <<task>>
+
+    rectangle "UI Task\n\n- handles display state\n- reads sensor values / setpoint\n- updates display" as UI_TASK <<task>>
+
+    rectangle "Temp / RH Task\n\n- reads temperature / humidity\n- publishes sensor values" as TEMP_TASK <<task>>
+
+    rectangle "Shell Task\n\n- UART command interface\n- reads / changes settings" as SHELL_TASK <<task>>
+
+    CTRL_TASK -[hidden]right-> NETWORK_TASK
+    NETWORK_TASK -[hidden]right-> BUTTON_TASKS
+    BUTTON_TASKS -[hidden]right-> UI_TASK
+    UI_TASK -[hidden]right-> TEMP_TASK
+    TEMP_TASK -[hidden]right-> SHELL_TASK
+}
+
+
+' ============================================================
+' services / hardware
+' ============================================================
+
+package "Services / Hardware" as HW {
+
+    rectangle "CO2 Valve\nGPIO" as VALVE <<hw>>
+
+    rectangle "CO2 Sensor\nModbus" as CO2_SENSOR <<hw>>
+
+    rectangle "Fan Controller\nModbus" as FAN <<hw>>
+
+    rectangle "EEPROM\nI2C0" as EEPROM <<service>>
+
+    rectangle "Temp / RH Sensor\nModbus" as TEMP_SENSOR <<hw>>
+
+    rectangle "UART0" as UART <<service>>
+
+    VALVE -[hidden]right-> CO2_SENSOR
+    CO2_SENSOR -[hidden]right-> FAN
+    FAN -[hidden]right-> EEPROM
+    EEPROM -[hidden]right-> TEMP_SENSOR
+    TEMP_SENSOR -[hidden]right-> UART
+}
+
+
+' ============================================================
+' package layout
+' ============================================================
+
+TIMERS -[hidden]right-> IPC
+TIMERS -[hidden]down-> ISRS
+
+IPC -[hidden]down-> TASKS
+TASKS -[hidden]down-> HW
+
+ISRS -[hidden]right-> HW
+
+
+' ============================================================
+' alignment anchors
+' ============================================================
+
+SETPOINT_MB -[hidden]down-> CTRL_TASK
+NETWORK_MB -[hidden]down-> NETWORK_TASK
+BUTTON_EG -[hidden]down-> BUTTON_TASKS
+DISPLAY_Q -[hidden]down-> UI_TASK
+SENSOR_MB -[hidden]down-> TEMP_TASK
+EEPROM_EG -[hidden]down-> SHELL_TASK
+
+CTRL_TASK -[hidden]down-> CO2_SENSOR
+UI_TASK -[hidden]down-> EEPROM
+TEMP_TASK -[hidden]down-> TEMP_SENSOR
+SHELL_TASK -[hidden]down-> UART
+
+VALVE_TIMER -[hidden]down-> VALVE_ISR
+UI_TIMER -[hidden]down-> ROT_ISR
+
+
+' ============================================================
+' ui timer / display event path
+' ============================================================
+
+UI_TASK ..> UI_TIMER : reset
+
+UI_TIMER ..> DISPLAY_Q : INACTIVE
+
+DISPLAY_Q ..> UI_TASK : receive
+
+
+' ============================================================
+' rotary encoder isr
+' ============================================================
+
+ROT_ISR ..> DISPLAY_Q : FromISR
+
+
+' ============================================================
+' co2 valve timer / alarm chain
+' ============================================================
+
+CTRL_TASK ..> VALVE_TIMER : start / stop
+
+VALVE_TIMER --> VALVE_ISR : HW alarm
+
+VALVE_TIMER --> VALVE : open
+
+VALVE_ISR --> VALVE : close
+
+
+' ============================================================
+' direct hardware access
+' ============================================================
+
+CO2_SENSOR --> CTRL_TASK : read CO2
+
+CTRL_TASK --> FAN : control
+
+TEMP_SENSOR --> TEMP_TASK : read temp / RH
+
+
+' ============================================================
+' bidirectional service access
+' ============================================================
+
+UI_TASK <--> EEPROM : read / write
+
+SHELL_TASK <--> EEPROM : read / write
+
+SHELL_TASK <--> UART : commands / output
+
+
+' ============================================================
+' legend
+' ============================================================
+
+legend bottom right
+  <back:#DCEBFA>   </back> task
+  <back:#DFF3E3>   </back> hardware
+  <back:#E7EFEF>   </back> service
+  <back:#FFF6CC>   </back> FreeRTOS IPC
+  <back:#FFE0B2>   </back> FreeRTOS timer
+  <back:#F8DDDD>   </back> ISR
+  <back:#ECE4F7>   </back> sync / event group
+
+  <--> bidirectional service access
+  -->  direct hardware / service access
+  ..>  FreeRTOS kernel mechanism
+
+  IPC boxes summarize producers / consumers
+
+  7 task instances total
+  (Button Tasks = 2 instances)
+endlegend
+
+@enduml
