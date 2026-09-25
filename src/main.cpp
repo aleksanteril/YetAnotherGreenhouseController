@@ -106,8 +106,7 @@ controller_task(void* param)
         CO2_Valve valve;
 
         int sp{};
-        xQueuePeek(Cache::setpoint_mb, &sp, 0);
-        P_Controller pid_valve(valve, sp, 0.1);
+        P_Controller pid_valve(valve, sp, 0.05);
         bool fan_enable{};
         P_Controller pid_fan(fan, sp, 2, false);
         Display::Event updt{ Display::UPDATE };
