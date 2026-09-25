@@ -4,6 +4,8 @@
 #include <optional>
 #include "constants.hpp"
 
+#include "hardware/watchdog.h"
+
 constexpr int INACTIVE{ -1 };
 
 bool
@@ -191,6 +193,11 @@ Shell::parse_cmd()
                 }
                 if (!e.save_network(*wlan)) {
                         u.send(fail_save);
+                } else {
+                        // reset device to enable new network
+                        // trying to change IPStack on the fly causes
+                        // tcp-pcb panic errors :(
+                        watchdog_reboot(0, 0, 1000);
                 }
         } else {
                 constexpr const char* msg{ "Unknown command, try help\r\n" };
