@@ -3,13 +3,12 @@
 
 #include "NetworkSettings.h"
 #include "ThingSpeakPacket.h"
-#include "IPStack.h"
-#include <array>
+#include "TlsClient.h"
 
 class ThingSpeakClient {
 public:
-    ThingSpeakClient(IPStack &ipstack, ThingSpeakConfig &settings,
-                     const char *server_ip, int port = 80);
+    ThingSpeakClient(TlsClient &ipstack, ThingSpeakConfig &settings,
+                     const char *server_ip, int port = 443);
 
     // Returns true if the server replied
     bool send_update(const ThingSpeakPacket &data);
@@ -37,7 +36,7 @@ private:
     // Locate the response body
     static const char *http_body(const char *response);
 
-    IPStack &ip;
+    TlsClient &ip;
     ThingSpeakConfig &cfg;
     const char* server_ip;
     int port;

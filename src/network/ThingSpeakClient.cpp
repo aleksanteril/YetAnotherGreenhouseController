@@ -1,6 +1,7 @@
 #include "ThingSpeakClient.h"
 
-#include "IPStack.h"
+#include "TlsClient.h"
+#include "pico/cyw43_arch.h"
 
 #include <cstdio>
 #include <string.h>
@@ -9,8 +10,8 @@
 // Response buffer for ThingSpeak's replies and headers.
 #define RESP_BUF_SIZE  1024
 
-ThingSpeakClient::ThingSpeakClient(IPStack &ipstack, ThingSpeakConfig &settings, const char *server_ip, const int port)
-: ip(ipstack), cfg(settings), port(port), server_ip(server_ip) 
+ThingSpeakClient::ThingSpeakClient(TlsClient &ipstack, ThingSpeakConfig &settings, const char *server_ip, const int port)
+    : ip(ipstack), cfg(settings), port(port), server_ip(server_ip)
 {
 }
 
@@ -209,14 +210,11 @@ ThingSpeakClient::parse_setpoint(const char *cmd, int *out_setpoint)
 bool
 ThingSpeakClient::reconnect() 
 {
-        // probe dns server to see we are on wifi
-        if(ip.connect("8.8.8.8", 53) != 0) {
-                // we arent on the internet
-                ip.disconnect();
-                return ip.reconnect_wifi(cfg.ssid, cfg.password) == 0;
-        } else {
-                // wifi is ok.
-                ip.disconnect();
+        int status = cyw43_tcpip_link_status(&cyw43_state, CYW43_ITF_STA);
+        if (status == CYW43_LINK_UP) {
+                // WiFi ok
                 return true;
         }
+        // Not connected
+        return ip.reconnect_wifi(cfg.ssid, cfg.password) == 0;
 }

@@ -21,9 +21,8 @@ add_executable(${ProjectName}
         ipstack/IPStack.cpp
         ipstack/IPStack.h
         ipstack/lwipopts.h
-        ipstack/tls_common.c
-        ipstack/picow_tls_client.c
         ipstack/lwipopts_tls.h
+        ipstack/mbedtls_config.h
 
         i2c/PicoI2C.cpp
         i2c/PicoI2C.h
@@ -46,6 +45,8 @@ add_executable(${ProjectName}
         network/ThingSpeakPacket.h
         network/ThingSpeakClient.cpp
         network/ThingSpeakClient.h
+        network/TlsClient.cpp
+        network/TlsClient.h
 
         display/framebuf.cpp
         display/framebuf.h
@@ -57,7 +58,6 @@ add_executable(${ProjectName}
         display/ssd1306os.cpp
         display/ui_display.hpp
         display/ui_display.cpp
-        network/NetworkSettings.h
 )
 
 target_include_directories(${ProjectName} PRIVATE

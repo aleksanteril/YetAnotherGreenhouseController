@@ -2,7 +2,7 @@
 #include "pico/stdio.h"
 #include "task.h"
 #include "queue.h"
-#include "IPStack.h"
+#include "TlsClient.h"
 
 // this is needed for runtime statistics
 #include "rt_statistics.h"
@@ -50,7 +50,7 @@ startup_task(void* param)
         xTaskCreate(controller_task, "CONTROLLER", 
                 256, (void*)&e, tskIDLE_PRIORITY + 2, nullptr);
         xTaskCreate(network_task, "NETWORK",
-                2048, nullptr, tskIDLE_PRIORITY + 1, NULL);
+                4096, nullptr, tskIDLE_PRIORITY + 1, NULL);
 
         vTaskDelete(nullptr);
 }
@@ -160,13 +160,14 @@ void network_task(void *param) {
 
         Cache::NetworkSetting_t wlan;
         xQueuePeek(Cache::network_mb, &wlan, portMAX_DELAY);
-        IPStack ipstack(wlan.ssid, wlan.pwd);
+        TlsClient ipstack(wlan.ssid, wlan.pwd);
 
         ThingSpeakConfig cfg {
                 .ssid = wlan.ssid,
                 .password = wlan.pwd
         };
-        ThingSpeakClient client(ipstack, cfg, cfg.server_ip, 80);
+        // Connect over TLS (port 443) using the hostname. DNS is resolved at runtime inside IPStack, no fixed server IP is needed
+        ThingSpeakClient client(ipstack, cfg, THINGSPEAK_HOST, 443);
         for(;;) {
                 // send every 30s
                 vTaskDelay(pdMS_TO_TICKS(30'000));
