@@ -1,4 +1,4 @@
-#include "TlsClient.h"
+#include "TLSClient.h"
 
 #include <cstring>
 #include <cstdio>
@@ -26,7 +26,7 @@ TLSClient::TLSClient(const char *ssid, const char *pw)
         DEBUG_printf("Connected.\n");
     }
 
-    tls_config = altcp_tls_create_config_client(NULL, 0);
+    tls_config = altcp_tls_create_config_client(nullptr, 0);
     if (!tls_config) {
         DEBUG_printf("Failed to create TLS config\n");
         return;
