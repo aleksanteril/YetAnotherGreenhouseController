@@ -6,10 +6,20 @@ add_executable(${ProjectName}
         lansk/blinker.cpp
         lansk/blinker.h
 
-        utilities/rt_statistics.cpp
+        constants.hpp
 
-#        ipstack/IPStack.cpp
-#        ipstack/IPStack.h
+        utilities/rt_statistics.cpp
+        utilities/rt_statistics.h
+        utilities/crc16.cpp
+        utilities/crc16.h
+        utilities/intnet.h
+        utilities/intnet.cpp
+
+        shell/shell.cpp
+        shell/shell.hpp
+
+        ipstack/IPStack.cpp
+        ipstack/IPStack.h
         ipstack/lwipopts.h
         ipstack/tls_common.c
         ipstack/picow_tls_client.c
@@ -17,6 +27,8 @@ add_executable(${ProjectName}
 
         i2c/PicoI2C.cpp
         i2c/PicoI2C.h
+        i2c/eeprom.hpp
+        i2c/eeprom.cpp
 
         uart/PicoOsUart.cpp
         uart/PicoOsUart.h
@@ -27,6 +39,13 @@ add_executable(${ProjectName}
         modbus/ModbusRegister.h
         modbus/ModbusClient.cpp
         modbus/ModbusClient.h
+        modbus/sensors.hpp
+        modbus/sensors.cpp
+
+        network/NetworkSettings.h
+        network/ThingSpeakPacket.h
+        network/ThingSpeakClient.cpp
+        network/ThingSpeakClient.h
 
         display/framebuf.cpp
         display/framebuf.h
@@ -36,6 +55,9 @@ add_executable(${ProjectName}
 #        display/ssd1306.h
         display/ssd1306os.h
         display/ssd1306os.cpp
+        display/ui_display.hpp
+        display/ui_display.cpp
+        network/NetworkSettings.h
 )
 
 target_include_directories(${ProjectName} PRIVATE
@@ -47,11 +69,13 @@ target_include_directories(${ProjectName} PRIVATE
         ipstack
         utilities
         lansk
+        shell
+        network
 )
 
 target_compile_definitions(${ProjectName} PRIVATE
-        WIFI_SSID=\"$ENV{WIFI_SSID}\"
-        WIFI_PASSWORD=\"$ENV{WIFI_PASSWORD}\"
+        #WIFI_SSID=\"$ENV{WIFI_SSID}\"
+        #WIFI_PASSWORD=\"$ENV{WIFI_PASSWORD}\"
         NO_SYS=0            # don't want NO_SYS (generally this would be in your lwipopts.h)
         PICO_CYW43_ARCH_DEFAULT_COUNTRY_CODE=CYW43_COUNTRY_FINLAND
 )
@@ -59,6 +83,7 @@ target_compile_definitions(${ProjectName} PRIVATE
 target_link_libraries(${ProjectName} 
         pico_stdlib
         hardware_i2c
+        pico_time
         FreeRTOS-Kernel-Heap4
         pico_cyw43_arch_lwip_sys_freertos
         pico_lwip_mbedtls

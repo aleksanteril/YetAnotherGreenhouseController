@@ -159,6 +159,10 @@ uint PicoI2C::transaction(uint8_t addr, const uint8_t *wbuffer, uint wlength, ui
     if (ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(1000)) == 0) {
         // timed out
         count = 0;
+    } else if (i2c->hw->tx_abrt_source != 0) {
+        // transmission was aborted, clear flag
+        (void)i2c->hw->clr_tx_abrt;
+        count = 0;
     } else {
         count -= rcnt + wctr;
     }

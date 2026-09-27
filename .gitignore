@@ -3,3 +3,6 @@ build
 .DS_Store
 .idea
 .vscode
+clang-tidy
+secret.h
+.clang-tidy
