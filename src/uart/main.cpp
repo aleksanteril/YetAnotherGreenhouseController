@@ -160,7 +160,7 @@ void network_task(void *param) {
 
         Cache::NetworkSetting_t wlan;
         xQueuePeek(Cache::network_mb, &wlan, portMAX_DELAY);
-        TlsClient ipstack(wlan.ssid, wlan.pwd);
+        TLSClient ipstack(wlan.ssid, wlan.pwd);
 
         ThingSpeakConfig cfg {
                 .ssid = wlan.ssid,

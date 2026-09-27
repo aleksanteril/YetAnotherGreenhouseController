@@ -9,10 +9,10 @@
 #include "lwip/altcp.h"
 #include "lwip/altcp_tls.h"
 
-class TlsClient {
+class TLSClient {
 public:
-    TlsClient(const char *ssid, const char *pw);
-    ~TlsClient();
+    TLSClient(const char *ssid, const char *pw);
+    ~TLSClient();
 
     int reconnect_wifi(const char *ssid, const char *pw);
 

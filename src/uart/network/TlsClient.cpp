@@ -32,7 +32,7 @@ MrY=\n\
 -----END CERTIFICATE-----\n";
 
 
-TlsClient::TlsClient(const char *ssid, const char *pw)
+TLSClient::TLSClient(const char *ssid, const char *pw)
     : tls_config(nullptr), pcb(nullptr), count(0), rd(0), connected(false), closed(false), dns_done(false) {
 
     if (cyw43_arch_init()) {
@@ -56,7 +56,7 @@ TlsClient::TlsClient(const char *ssid, const char *pw)
     mbedtls_ssl_conf_authmode((mbedtls_ssl_config *)tls_config, MBEDTLS_SSL_VERIFY_REQUIRED);
 }
 
-TlsClient::~TlsClient() {
+TLSClient::~TLSClient() {
     disconnect();
     if (tls_config) {
         altcp_tls_free_config(tls_config);
@@ -64,14 +64,14 @@ TlsClient::~TlsClient() {
     }
 }
 
-int TlsClient::reconnect_wifi(const char *ssid, const char *pw) {
+int TLSClient::reconnect_wifi(const char *ssid, const char *pw) {
     return cyw43_arch_wifi_connect_timeout_ms(ssid, pw, CYW43_AUTH_WPA2_AES_PSK, 30000);
 }
 
 
-void TlsClient::dns_found(const char *name, const ip_addr_t *ipaddr, void *arg) {
+void TLSClient::dns_found(const char *name, const ip_addr_t *ipaddr, void *arg) {
     (void)name;
-    auto *self = static_cast<TlsClient *>(arg);
+    auto *self = static_cast<TLSClient *>(arg);
     if (ipaddr) {
         self->remote_addr = *ipaddr;
     } else {
@@ -81,9 +81,9 @@ void TlsClient::dns_found(const char *name, const ip_addr_t *ipaddr, void *arg) 
 }
 
 
-err_t TlsClient::tls_connected(void *arg, altcp_pcb *pcb, err_t err) {
+err_t TLSClient::tls_connected(void *arg, altcp_pcb *pcb, err_t err) {
     (void)pcb;
-    auto *self = static_cast<TlsClient *>(arg);
+    auto *self = static_cast<TLSClient *>(arg);
     if (err != ERR_OK) {
         self->closed = true;
         return err;
@@ -92,9 +92,9 @@ err_t TlsClient::tls_connected(void *arg, altcp_pcb *pcb, err_t err) {
     return ERR_OK;
 }
 
-err_t TlsClient::tls_recv(void *arg, altcp_pcb *pcb, pbuf *p, err_t err) {
+err_t TLSClient::tls_recv(void *arg, altcp_pcb *pcb, pbuf *p, err_t err) {
     (void)err;
-    auto *self = static_cast<TlsClient *>(arg);
+    auto *self = static_cast<TLSClient *>(arg);
     if (!p) {
         self->closed = true;
         return ERR_OK;
@@ -113,20 +113,20 @@ err_t TlsClient::tls_recv(void *arg, altcp_pcb *pcb, pbuf *p, err_t err) {
     return ERR_OK;
 }
 
-err_t TlsClient::tls_poll(void *arg, altcp_pcb *pcb) {
+err_t TLSClient::tls_poll(void *arg, altcp_pcb *pcb) {
     (void)pcb;
     (void)arg;
     return ERR_OK;
 }
 
-void TlsClient::tls_err(void *arg, err_t err) {
+void TLSClient::tls_err(void *arg, err_t err) {
     (void)err;
-    auto *self = static_cast<TlsClient *>(arg);
+    auto *self = static_cast<TLSClient *>(arg);
     self->pcb = nullptr; // already freed by lwIP
     self->closed = true;
 }
 
-int TlsClient::connect(const char *hostname, int port) {
+int TLSClient::connect(const char *hostname, int port) {
     if (!tls_config) {
         return -1;
     }
@@ -197,7 +197,7 @@ int TlsClient::connect(const char *hostname, int port) {
 }
 
 
-int TlsClient::write(unsigned char *buffer, int len, int timeout) {
+int TLSClient::write(unsigned char *buffer, int len, int timeout) {
     (void)timeout;
     if (!pcb || !connected || closed) {
         return -1;
@@ -216,7 +216,7 @@ int TlsClient::write(unsigned char *buffer, int len, int timeout) {
 }
 
 
-int TlsClient::read(unsigned char *buffer, int len, int timeout) {
+int TLSClient::read(unsigned char *buffer, int len, int timeout) {
     absolute_time_t to = make_timeout_time_ms(timeout);
     while (count == 0 && !closed && !time_reached(to)) {
         cyw43_arch_poll();
@@ -234,7 +234,7 @@ int TlsClient::read(unsigned char *buffer, int len, int timeout) {
 }
 
 
-int TlsClient::disconnect() {
+int TLSClient::disconnect() {
     cyw43_arch_lwip_begin();
     if (pcb != nullptr) {
         altcp_arg(pcb, nullptr);

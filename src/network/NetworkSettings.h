@@ -13,10 +13,8 @@ struct ThingSpeakConfig {
 
     // ThingSpeak keys
     const char* api_key      = TS_API_KEY;
-    int  talkback_id       = TS_TALCKBACK_ID;
-    const char* talkback_key  = TS_TALCKBACK_KEY;
-
-    const char* server_ip     = TS_SERVER_IP;
+    int  talkback_id       = TS_TALKBACK_ID;
+    const char* talkback_key  = TS_TALKBACK_KEY;
 };
 
 #endif //CO2CONTROLLER_NETWORK_H

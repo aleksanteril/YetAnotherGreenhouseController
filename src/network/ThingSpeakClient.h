@@ -7,7 +7,7 @@
 
 class ThingSpeakClient {
 public:
-    ThingSpeakClient(TlsClient &ipstack, ThingSpeakConfig &settings,
+    ThingSpeakClient(TLSClient &ipstack, ThingSpeakConfig &settings,
                      const char *server_ip, int port = 443);
 
     // Returns true if the server replied
@@ -36,7 +36,7 @@ private:
     // Locate the response body
     static const char *http_body(const char *response);
 
-    TlsClient &ip;
+    TLSClient &ip;
     ThingSpeakConfig &cfg;
     const char* server_ip;
     int port;

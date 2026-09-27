@@ -45,8 +45,8 @@ add_executable(${ProjectName}
         network/ThingSpeakPacket.h
         network/ThingSpeakClient.cpp
         network/ThingSpeakClient.h
-        network/TlsClient.cpp
-        network/TlsClient.h
+        network/TLSClient.cpp
+        network/TLSClient.h
 
         display/framebuf.cpp
         display/framebuf.h

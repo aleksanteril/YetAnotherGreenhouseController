@@ -10,7 +10,7 @@
 // Response buffer for ThingSpeak's replies and headers.
 #define RESP_BUF_SIZE  1024
 
-ThingSpeakClient::ThingSpeakClient(TlsClient &ipstack, ThingSpeakConfig &settings, const char *server_ip, const int port)
+ThingSpeakClient::ThingSpeakClient(TLSClient &ipstack, ThingSpeakConfig &settings, const char *server_ip, const int port)
     : ip(ipstack), cfg(settings), port(port), server_ip(server_ip)
 {
 }
