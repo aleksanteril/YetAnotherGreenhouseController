@@ -1,7 +1,5 @@
 #include "ThingSpeakClient.h"
 
-#include "IPStack.h"
-
 #include <cstdio>
 #include <string.h>
 #include "constants.hpp"
@@ -9,31 +7,30 @@
 // Response buffer for ThingSpeak's replies and headers.
 #define RESP_BUF_SIZE  1024
 
-ThingSpeakClient::ThingSpeakClient(IPStack &ipstack, ThingSpeakConfig &settings, const char *server_ip, const int port)
-: ip(ipstack), cfg(settings), port(port), server_ip(server_ip) 
+ThingSpeakClient::ThingSpeakClient
+(TLSClient &ipstack, ThingSpeakConfig &settings, const char *server, const int port, EEPROM& e)
+    : ip(ipstack), cfg(settings), server(server), port(port), e(e)
 {
 }
 
-int ThingSpeakClient::exchange(const char *request, char *resp_buf, int resp_buf_size) {
-    int rc = ip.connect(server_ip, port);
+int ThingSpeakClient::exchange(char *request, char *resp_buf, int resp_buf_size) 
+{
+    // write request to our TLS object
+    int wlen = (int)strlen(request);
+    int wr = ip.write(request, wlen);
+
+    // this function blocks via notify, until connection completed
+    int rc = ip.connect(server, port, 20000);
     if (rc != 0) {
         return -1;
     }
-
-    int wlen = (int)strlen(request);
-    int wr = ip.write((unsigned char *)request, wlen, 1000);
-    if (wr < 0) {
-        ip.disconnect();
-        return -2;
-    }
-
-    int total = ip.read((unsigned char *)resp_buf, resp_buf_size - 1, 5000);
+    
+    // read our resp buffer from TLS object
+    int total = ip.read(resp_buf, resp_buf_size - 1);
     if (total < 0) {
         total = 0;
     }
     resp_buf[total] = '\0';
-
-    ip.disconnect();
     return total;
 }
 
@@ -68,76 +65,66 @@ const char *ThingSpeakClient::http_body(const char *response) {
     return nullptr;
 }
 
+
+
 bool ThingSpeakClient::send_update(const ThingSpeakPacket &data) {
     // field1=CO2, field2=RH, field3=Temp, field4=Fan%, field5=Setpoint
+    char request[512];
+    {
+        char body[256];
+        const int body_len = snprintf(
+                body, sizeof(body),
+                "field1=%d" 
+                "&field2=%.1lf" 
+                "&field3=%.1lf"                      
+                "&field4=%d" 
+                "&field5=%d"
+                "&api_key=%s" 
+                "&talkback_key=%s",
+                data.co2_ppm,
+                data.humidity,
+                data.temperature,
+                data.fan_percent,
+                data.setpoint_ppm,
+                cfg.api_key,
+                cfg.talkback_key);
 
-    char request[256];
-    const int req_len = snprintf(
-        request, sizeof(request),
-        "GET /update?api_key=%s" 
-        "&field1=%d" 
-        "&field2=%.1lf" 
-        "&field3=%.1lf"                      
-        "&field4=%d" 
-        "&field5=%d HTTP/1.1\r\n" 
-        "Host: api.thingspeak.com\r\n" 
-        "\r\n",
-        cfg.api_key,
-        data.co2_ppm,
-        data.humidity,
-        data.temperature,
-        data.fan_percent,
-        data.setpoint_ppm);
-
-    if (req_len < 0 || req_len >= (int)sizeof(request)) {
-        return false;
+        const int req_len = snprintf(
+                request, sizeof(request),
+                "POST /update.json HTTP/1.1\r\n"
+                "Host: api.thingspeak.com\r\n"
+                "User-Agent: PicoW\r\n"
+                "Accept: */*\r\n"
+                "Content-Length: %d\r\n"
+                "Content-Type: application/x-www-form-urlencoded\r\n"
+                "\r\n"
+                "%s", body_len, body);
+        
+        if (req_len < 0 || req_len >= (int)sizeof(request)) {
+                return false;
+        }
     }
-
     char resp[RESP_BUF_SIZE];
     int n = exchange(request, resp, sizeof(resp));
     if (n <= 0) {
         return false;
     }
-
-    int status = http_status_code(resp);
+    if (http_status_code(resp) != 200) {
+        return false;
+    } 
+    char cmd[32];
+    if (parse_talkback(resp, cmd, sizeof(cmd))) {
+        if(int sp; (sp = parse_setpoint(cmd)) >= 0) {
+                e.save_setpoint(sp);
+        }
+    };
+    
     // /update.json returns the new entry id in the body on success, and 200.
-    return status == 200;
+    return true;
 }
 
-bool ThingSpeakClient::poll_talkback(char *out_cmd, int out_cmd_size) {
-    if (!out_cmd || out_cmd_size <= 0) {
-        return false;
-    }
-    out_cmd[0] = '\0';
-
-    // Body is just talkback api_key
-    char body[64];
-    int body_len = std::snprintf(body, sizeof(body), "api_key=%s", cfg.talkback_key);
-    if (body_len < 0 || body_len >= (int)sizeof(body)) {
-        return false;
-    }
-
-    char request[256];
-    int req_len = std::snprintf(
-        request, sizeof(request),
-        "POST /talkbacks/%d/commands/execute.json HTTP/1.1\r\n"
-        "Host: " THINGSPEAK_HOST "\r\n"
-        "Connection: close\r\n"
-        "Content-Type: application/x-www-form-urlencoded\r\n"
-        "Content-Length: %d\r\n"
-        "\r\n"
-        "%s",
-        cfg.talkback_id, body_len, body);
-
-    if (req_len < 0 || req_len >= (int)sizeof(request)) {
-        return false;
-    }
-
-    char resp[RESP_BUF_SIZE];
-    if (exchange(request, resp, sizeof(resp)) <= 0) {
-        return false;
-    }
-
+bool ThingSpeakClient::parse_talkback(char* resp, char* out_cmd, size_t size) 
+{
     if (http_status_code(resp) != 200) {
         return false;
     }
@@ -171,7 +158,7 @@ bool ThingSpeakClient::poll_talkback(char *out_cmd, int out_cmd_size) {
     p++;
 
     int i = 0;
-    while (*p && *p != '"' && i < out_cmd_size - 1) {
+    while (*p && *p != '"' && i < size - 1) {
         out_cmd[i++] = *p++;
     }
     out_cmd[i] = '\0';
@@ -179,18 +166,14 @@ bool ThingSpeakClient::poll_talkback(char *out_cmd, int out_cmd_size) {
     return i > 0;
 }
 
-bool 
-ThingSpeakClient::parse_setpoint(const char *cmd, int *out_setpoint) 
+int
+ThingSpeakClient::parse_setpoint(const char *cmd) 
 {
-        if (!cmd || !out_setpoint) {
-                return false;
-        }
-
         int val{};
         char extra{};
-        if (sscanf(cmd, "SETPOINT %d %c", &val, &extra) !=
+        if (sscanf(cmd, "SP=%d %c", &val, &extra) !=
             1) { // Returns 1 if only a value is found after SETPOINT
-                return false;
+                return -1;
         }
 
         // Check the valid range 0 - 1500 ppm
@@ -200,28 +183,11 @@ ThingSpeakClient::parse_setpoint(const char *cmd, int *out_setpoint)
         if (val > MAX_CO2_SP) {
                 val = MAX_CO2_SP;
         }
-
-        *out_setpoint = val;
-        return true;
+        return val;
 }
 
 bool
 ThingSpeakClient::reconnect() 
 {
-        bool ok{};
-        // probe dns server to see we are on wifi
-        if(ip.connect("8.8.8.8", 53) != 0) {
-                // we arent on the internet
-                ok = ip.reconnect_wifi(cfg.ssid, cfg.password) == 0;
-        }
-        ip.disconnect();
-        return ok;
-}
-
-bool
-ThingSpeakClient::reconnect(const char* ssid, const char* pwd)
-{
-        cfg.ssid = ssid;
-        cfg.password = pwd;
-        return ip.reconnect_wifi(ssid, pwd) == 0;
+        return ip.reconnect_wifi(cfg.ssid, cfg.password) == 0;
 }

@@ -1,5 +1,5 @@
-#ifndef CO2_SHARED_DATA_H
-#define CO2_SHARED_DATA_H
+#ifndef CO2_THINGSPEAK_PACKET_H
+#define CO2_THINGSPEAK_PACKET_H
 
 #include "pico/types.h"
 
@@ -11,4 +11,4 @@ struct ThingSpeakPacket {
     int setpoint_ppm = 0;      // field5 - CO2 set point
 };
 
-#endif // CO2_SHARED_DATA_H
+#endif // CO2_THINGSPEAK_PACKET_H

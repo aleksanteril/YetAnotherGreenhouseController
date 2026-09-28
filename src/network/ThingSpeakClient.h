@@ -3,45 +3,39 @@
 
 #include "NetworkSettings.h"
 #include "ThingSpeakPacket.h"
-#include "IPStack.h"
-#include <array>
+#include "TLSClient.h"
+#include "eeprom.hpp"
 
 class ThingSpeakClient {
 public:
-    ThingSpeakClient(IPStack &ipstack, ThingSpeakConfig &settings,
-                     const char *server_ip, int port = 80);
+    ThingSpeakClient(TLSClient &ipstack, ThingSpeakConfig &settings,
+                     const char *server, const int port, EEPROM& e);
 
-    // Returns true if the server replied
+    // Returns true if the server replied.
+    // this now sends the fields and also clears the talkback queue by 1
     bool send_update(const ThingSpeakPacket &data);
 
-    // On success, copies the command string into out_cmd and returns true
-    // Returns false if there is no command, on network error, or on parse failure
-    bool poll_talkback(char *out_cmd, int out_cmd_size);
-
-    void set_server_ip(const char *ip);
-
-    bool parse_setpoint(const char *cmd, int *out_setpoint);
-
-    // reconnect to wifi, or change current wifi to new one
+    // reconnect to wifi
     bool reconnect();
-    bool reconnect(const char* ssid, const char* pwd);
 
 private:
     // Perform one request/response exchange
     // Writes the response into resp_buf (NUL-terminated)
     // Returns number of bytes read, or < 0 on error
-    int exchange(const char *request, char *resp_buf, int resp_buf_size);
-
+    int exchange(char *request, char *resp_buf, int resp_buf_size);
     // Extract the HTTP status code from a response
     static int http_status_code(const char *response);
-
     // Locate the response body
     static const char *http_body(const char *response);
 
-    IPStack &ip;
+    bool parse_talkback(char* resp, char* out_cmd, size_t size);
+    int parse_setpoint(const char *cmd);
+
+    TLSClient &ip;
     ThingSpeakConfig &cfg;
-    const char* server_ip;
-    int port;
+    const char* server;
+    const int port;
+    EEPROM& e;
 };
 
 #endif //CO2CONTROLLER_THINGSPEAK_CLIENT_H

@@ -11,8 +11,8 @@ namespace Sensors
         struct SensorPacket_t {
                 TickType_t timestamp;
                 union {
-                        double doubl;
-                        uint16_t uint16;
+                        double f64;
+                        uint16_t u16;
                 };
         };
 
@@ -63,8 +63,6 @@ class PRODUAL {
         write_speed(uint16_t val);
         void
         set_output(int percent);
-        bool
-        watchdog();
 
       private:
         bool running{ false };

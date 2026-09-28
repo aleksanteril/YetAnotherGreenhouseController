@@ -85,15 +85,29 @@ UI_Display::change_state_to(State st)
 }
 
 // Helper function for info state
-static bool
-read_info_eeprom(EEPROM& e, std::span<char> setp)
+static void
+read_info_eeprom(EEPROM& e, ssd1306os& display)
 {
         uint16_t setpoint{};
-        if(!e.load_setpoint(setpoint)) {
-                return false;
+        Cache::NetworkSetting_t packet;
+        if(!e.load_setpoint(setpoint) || !e.load_network(packet)) {
+                display.text("EEPROM Fail!", 0, 0, 1);
+                display.text("Failed to load!", 0, 9, 1);
+                return;
         }
+        std::array<char, 16> setp;
         snprintf(setp.data(), setp.size(), "- %4u ppm -", setpoint);
-        return true;
+        display.text("CO2 TARGET", 24, 0, 1);
+        display.text(setp.data(), 16, 10, 1);
+        display.text("NETWORK SSID", 16, 28, 1);
+        if(size_t len{ strlen(packet.ssid) }; len > 16) {
+                // if cut off get second row
+                display.text(packet.ssid, 0, 42);
+                len = strlen(packet.ssid+16);
+                display.text(packet.ssid+16, 4*(16-len), 52);
+        } else {
+                display.text(packet.ssid, 4*(16-len), 42);
+        }
 }
 
 void
@@ -102,13 +116,7 @@ UI_Display::info(enum intEvent _e)
         switch(_e) {
         case Enter:
                 display.fill(0);
-                if (read_info_eeprom(eeprom, info_setp)) {
-                        display.text("CO2 TARGET", 24, 0, 1);
-                        display.text(info_setp.data(), 16, 10, 1);
-                } else {
-                        display.text("EEPROM Fail!", 0, 0, 1);
-                        display.text("Failed to load!", 0, 9, 1);
-                }
+                read_info_eeprom(eeprom, display);
                 display.show();
                 xTimerReset(inact_t, 0);
                 break;
@@ -181,6 +189,26 @@ save_valid_setpoint(EEPROM& e, std::span<int> vals)
 }
 
 void
+UI_Display::set_network(enum intEvent _e)
+{
+        switch(_e) {
+        case Enter:
+                display.fill(0);
+                display.text("SET NETWORK", 9, 0, 1);
+                display.show();
+                xTimerReset(inact_t, 0);
+                break;
+        case Loop:
+                if(ev == INACTIVE) {
+                        change_state_to(&UI_Display::status);
+                }
+                break;
+        case Exit:
+                break;
+        }
+}
+
+void
 UI_Display::set_target(enum intEvent _e)
 {
         switch(_e) {
@@ -245,6 +273,7 @@ UI_Display::menu(enum intEvent _e)
                 display.fill(0);
                 display.text("INFO", 18, 0, 1);
                 display.text("SET CO2 TARGET", 18, 9, 1);
+                display.text("SET NETWORK", 18, 18, 1);
                 display.text("->", 0, menu_i*9, 1);
                 display.show();
                 xTimerReset(inact_t, 0);
@@ -274,13 +303,13 @@ handle_draw_sensors(ssd1306os& display)
 {
         Sensors::SensorPacket_t packet;
         xQueuePeek(Sensors::co2_mb, &packet, 0);
-        uint16_t co2{ packet.uint16 };
+        uint16_t co2{ packet.u16 };
         xQueuePeek(Sensors::rh_mb, &packet, 0);
-        double rh{ packet.doubl };
+        double rh{ packet.f64 };
         xQueuePeek(Sensors::temp_mb, &packet, 0);
-        double temp{ packet.doubl };
+        double temp{ packet.f64 };
         uint16_t sp{};
-        xQueuePeek(EEPROMCache::setpoint_mb, &sp, 0);
+        xQueuePeek(Cache::setpoint_mb, &sp, 0);
 
         display.fill(0);
         std::array<char, 32> buf;
