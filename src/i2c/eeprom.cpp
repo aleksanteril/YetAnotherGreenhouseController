@@ -1,11 +1,16 @@
 #include "eeprom.hpp"
 
-QueueHandle_t EEPROMCache::setpoint_mb{ nullptr };
-QueueHandle_t EEPROMCache::network_mb{ nullptr };
+QueueHandle_t Cache::setpoint_mb{ nullptr };
+QueueHandle_t Cache::network_mb{ nullptr };
 
-// Memory alignment, SETPOINT 2b CRC16 2b ; IPADDR 4b CRC16 2b
+// Memory alignment, 
+// SETPOINT 2B CRC16 2B ; NETWORK_CRC16 2B ; SSID 33B
+// PWD 64B
+
 constexpr uint SETPOINT_ADDR{ 0x0 };
-constexpr uint NETWORK_ADDR{ 0x64 };
+constexpr uint SSID_ADDR{ SETPOINT_ADDR+(sizeof(uint16_t)*2) };
+constexpr uint PWD_ADDR{ 0x40 };
+
 constexpr int GO_BITS{ 0x1 };
 constexpr int EEPROM_ADDR{ 0x50 };
 constexpr int I2C_SPEED{ 400000 };
@@ -14,15 +19,15 @@ constexpr int I2C_SPEED{ 400000 };
 EEPROM::EEPROM(uint bus_nr)
 : PicoI2C(bus_nr, I2C_SPEED), dev_addr(EEPROM_ADDR)
 {
-        EEPROMCache::setpoint_mb = xQueueCreate(1, sizeof(uint16_t));
-        EEPROMCache::network_mb = xQueueCreate(1, 
-                                sizeof(EEPROMCache::NetworkSetting_t));
-        vQueueAddToRegistry(EEPROMCache::setpoint_mb, "SETPOINT_MB");
-        vQueueAddToRegistry(EEPROMCache::network_mb, "NETWORK_MB");
-        uint16_t sp = EEPROMCache::DEFAULT_SETPOINT;
-        xQueueOverwrite(EEPROMCache::setpoint_mb, (void*)&sp);
-        auto packet = EEPROMCache::DEFAULT_NETWORK;
-        xQueueOverwrite(EEPROMCache::network_mb, &packet);
+        Cache::setpoint_mb = xQueueCreate(1, sizeof(uint16_t));
+        Cache::network_mb = xQueueCreate(1, 
+                                sizeof(Cache::NetworkSetting_t));
+        vQueueAddToRegistry(Cache::setpoint_mb, "SETPOINT_MB");
+        vQueueAddToRegistry(Cache::network_mb, "NETWORK_MB");
+        uint16_t sp = Cache::DEFAULT_SETPOINT;
+        xQueueOverwrite(Cache::setpoint_mb, (void*)&sp);
+        auto packet = Cache::DEFAULT_NETWORK;
+        xQueueOverwrite(Cache::network_mb, &packet);
         xEventGroupSetBits(go, GO_BITS);
 }
 
@@ -31,7 +36,7 @@ EEPROM::save_setpoint(uint16_t setpoint)
 {
         // Hook to change setpoint even though it doesnt save, allowing
         // use without EEPROM
-        xQueueOverwrite(EEPROMCache::setpoint_mb, (void*)&setpoint);
+        xQueueOverwrite(Cache::setpoint_mb, (void*)&setpoint);
         // 4 bytes
         uint8_t buf[4];
         buf[0] = (uint8_t)(setpoint >> 8U);
@@ -53,8 +58,51 @@ EEPROM::load_setpoint(uint16_t& setpoint)
                 return false;
         }
         setpoint = ((uint16_t)buf[0] << 8U) | buf[1];
-        xQueueOverwrite(EEPROMCache::setpoint_mb, &setpoint);
+        xQueueOverwrite(Cache::setpoint_mb, &setpoint);
         return true;
+}
+
+bool
+EEPROM::save_network(Cache::NetworkSetting_t& packet)
+{
+        //  crc16 + ssid + pwd
+        // saved on 2 sections
+        uint8_t* p_ptr = (uint8_t*)&packet;
+        packet.crc = crc16(p_ptr+2, 33+64);
+        packet.timestamp = xTaskGetTickCount();
+        xQueueOverwrite(Cache::network_mb, (void*)&packet);
+        xor_encrypt(p_ptr, 2+33+64, KEY);
+        if(!write_page(SSID_ADDR, p_ptr, 2+33)) {
+                return false;
+        }
+        return write_page(PWD_ADDR, p_ptr+2+33, 64);
+}
+
+bool
+EEPROM::load_network(Cache::NetworkSetting_t& packet)
+{
+        uint8_t* p_ptr = (uint8_t*)&packet;
+        if(!read_page(SSID_ADDR, p_ptr, 2+33)) {
+                return false;
+        }
+        if(!read_page(PWD_ADDR, p_ptr+2+33, 64)) {
+                return false;
+        }
+        xor_encrypt(p_ptr, 2+33+64, KEY);
+        if(crc16(p_ptr+2, 33+64) != packet.crc) {
+                return false;
+        }
+        packet.timestamp = xTaskGetTickCount();
+        xQueueOverwrite(Cache::network_mb, (void*)&packet);
+        return true;
+}
+
+void
+EEPROM::xor_encrypt(uint8_t* bytes, size_t len, uint8_t key)
+{
+        for(int i{}; i < len; ++i, ++bytes) {
+                *bytes ^= key;
+        }
 }
 
 // True on success

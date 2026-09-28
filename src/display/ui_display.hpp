@@ -50,10 +50,13 @@ class UI_Display {
         std::array<int, 4> set_val{};
         void
         set_target(enum intEvent);
+
+        void
+        set_network(enum intEvent);
         
         int menu_i{};
-        const std::array<State, 2> items{ &UI_Display::info, 
-                &UI_Display::set_target};
+        const std::array<State, 3> items{ &UI_Display::info, 
+                &UI_Display::set_target, &UI_Display::set_network};
         void
         menu(enum intEvent);
         

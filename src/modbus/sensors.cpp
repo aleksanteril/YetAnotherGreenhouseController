@@ -26,7 +26,7 @@ HMP60::read_rh()
         double val{ (rh.read() / 10.0) }; 
         Sensors::SensorPacket_t packet{
                 .timestamp = xTaskGetTickCount(),
-                .doubl = val
+                .f64 = val
         };
         xQueueOverwrite(rh_mb, (void*)&packet);
         return val;
@@ -37,7 +37,7 @@ HMP60::read_temp()
         double val{ (temp.read() / 10.0) }; 
         Sensors::SensorPacket_t packet{
                 .timestamp = xTaskGetTickCount(),
-                .doubl = val
+                .f64 = val
         };
         xQueueOverwrite(temp_mb, (void*)&packet);
         return val;
@@ -58,7 +58,7 @@ GMP252::read_co2()
         uint16_t val{ co2.read() };
         Sensors::SensorPacket_t packet{
                 .timestamp = xTaskGetTickCount(),
-                .uint16 = val
+                .u16 = val
         };
         xQueueOverwrite(co2_mb, (void*)&packet);
         return val;
@@ -70,6 +70,7 @@ constexpr uint PRODUAL_ADDR{ 1 };
 PRODUAL::PRODUAL(std::shared_ptr<ModbusClient> client_)
 : counter(client_, PRODUAL_ADDR, 4, false), speed(client_, PRODUAL_ADDR, 0) 
 {
+        set_output(0);
 }
 
 int
@@ -84,30 +85,20 @@ PRODUAL::read_speed()
         return (speed.read() / 10.0); 
 }
 
-bool
-PRODUAL::watchdog()
-{
-        if(running) {
-                //set running and counter comes back 0 fail
-                return (bool)read_counter();
-        } else {
-                //not running just ignore
-                return true;
-        }
-}
-
 // 0 - 1000
 void
 PRODUAL::write_speed(uint16_t val) 
 { 
+        // read watchdog
+        running = (bool)read_counter();
         if(!running && val > 0) {
                 // kickstart to run
                 speed.write(600);
-                vTaskDelay(pdMS_TO_TICKS(10));
-                running = true;
+                vTaskDelay(pdMS_TO_TICKS(250));
+                running = (bool)read_counter();
         } else if(running && val <= 0) {
                 speed.write(0);
-                running = false;
+                running = (bool)read_counter();
         }
         if(running) {
                 speed.write(val > 1000 ? 1000 : val);
@@ -117,12 +108,12 @@ PRODUAL::write_speed(uint16_t val)
 void
 PRODUAL::set_output(int percent)
 {
-        if(percent < 0) {
+        if(percent <= 0) {
                 percent = 0;
-        } else if(percent < 20) {
+        } else if(percent <= 20) {
                 // minimum speed to turn the fan
                 percent = 20;
-        } else if(percent > 100) {
+        } else if(percent >= 100) {
                 percent = 100;
         }
         write_speed(percent*10);
@@ -144,11 +135,10 @@ CO2_Valve::CO2_Valve()
 {
         gpio_init(pin);
         gpio_set_dir(pin, GPIO_OUT);
-        gpio_put(pin, false);
-
         gpio_init(led_pin);
         gpio_set_dir(led_pin, GPIO_OUT);
-        gpio_put(led_pin, false);
+        close();
+        set_output(0);
 }
 
 void 
@@ -173,10 +163,10 @@ CO2_Valve::set_output(int percent)
                 //close();
                 return;
         } 
-        if(percent < 10) {
+        if(percent <= 10) {
                 // min 1s of co2
                 percent = 10;
-        } else if(percent > 30) {
+        } else if(percent >= 30) {
                 // max 3s of co2
                 percent = 30;
         }
