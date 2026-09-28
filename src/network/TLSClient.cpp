@@ -94,6 +94,7 @@ err_t TLSClient::tls_recv(void *arg, altcp_pcb *pcb, pbuf *p, err_t err) {
         return ERR_OK;
     }
     if (p->tot_len > 0) {
+        DEBUG_printf("received %dB\n", p->tot_len);
         int write_pos = self->rd + self->count;
         int space = BUF_SIZE - write_pos;
         int to_copy = p->tot_len < space ? p->tot_len : space;
@@ -178,12 +179,7 @@ int TLSClient::write(char *buffer, int len) {
 int TLSClient::read(char *buffer, int len) {
     int to_copy = count < len ? count : len;
     if (to_copy > 0) {
-        std::memcpy(buffer, this->buffer + rd, to_copy);
-        rd += to_copy;
-        count -= to_copy;
-        if (count == 0) {
-            rd = 0;
-        }
+        std::memcpy(buffer, this->buffer, to_copy);
     }
     return to_copy;
 }
