@@ -64,6 +64,9 @@ void TLSClient::dns_found(const char *name, const ip_addr_t *ipaddr, void *arg) 
     auto *self = static_cast<TLSClient *>(arg);
     if (ipaddr) {
         tls_connect_to_server_ip(ipaddr, arg);
+    } else {
+        DEBUG_printf("error resolving dns\n");
+        tls_disconnect(arg);
     }
 }
 
