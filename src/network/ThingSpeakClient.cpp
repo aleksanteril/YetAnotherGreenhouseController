@@ -1,7 +1,5 @@
 #include "ThingSpeakClient.h"
 
-#include "pico/cyw43_arch.h"
-
 #include <cstdio>
 #include <string.h>
 #include "constants.hpp"
@@ -21,6 +19,7 @@ int ThingSpeakClient::exchange(char *request, char *resp_buf, int resp_buf_size)
     int wlen = (int)strlen(request);
     int wr = ip.write(request, wlen);
 
+    // this function blocks via notify, until connection completed
     int rc = ip.connect(server, port, 20000);
     if (rc != 0) {
         return -1;
@@ -190,11 +189,5 @@ ThingSpeakClient::parse_setpoint(const char *cmd)
 bool
 ThingSpeakClient::reconnect() 
 {
-        int status = cyw43_tcpip_link_status(&cyw43_state, CYW43_ITF_STA);
-        if (status == CYW43_LINK_UP) {
-                // WiFi ok
-                return true;
-        }
-        // Not connected
         return ip.reconnect_wifi(cfg.ssid, cfg.password) == 0;
 }

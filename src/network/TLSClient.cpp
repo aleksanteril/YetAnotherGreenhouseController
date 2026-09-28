@@ -43,6 +43,11 @@ TLSClient::~TLSClient() {
 }
 
 int TLSClient::reconnect_wifi(const char *ssid, const char *pw) {
+    int status = cyw43_tcpip_link_status(&cyw43_state, CYW43_ITF_STA);
+    if (status == CYW43_LINK_UP) {
+                // WiFi ok
+                return ERR_OK;
+    }
     return cyw43_arch_wifi_connect_timeout_ms(ssid, pw, CYW43_AUTH_WPA2_AES_PSK, 30000);
 }
 
@@ -157,7 +162,7 @@ int TLSClient::connect(const char *hostname, int port=443, int timeout_ms=15000)
 
     // wait for connection to close
     auto timeout{ pdMS_TO_TICKS(timeout_ms) };
-    if (ulTaskNotifyTake(pdTRUE, portMAX_DELAY) == 0) {
+    if (ulTaskNotifyTake(pdTRUE, timeout) == 0) {
         // timed out
         DEBUG_printf("connect timeout %d\n", err);
         tls_disconnect(this);
@@ -189,8 +194,6 @@ err_t TLSClient::tls_disconnect(void* arg) {
     auto *self = static_cast<TLSClient *>(arg);
     err_t err = ERR_OK;
     DEBUG_printf("deleting pcb\n");
-    // give signal connection closing
-    xTaskNotifyGive(self->to_notify);
     cyw43_arch_lwip_begin();
     if (self->pcb != nullptr) {
         altcp_arg(self->pcb, nullptr);
@@ -205,5 +208,7 @@ err_t TLSClient::tls_disconnect(void* arg) {
         self->pcb = nullptr;
     }
     cyw43_arch_lwip_end();
+    // give signal connection closing
+    xTaskNotifyGive(self->to_notify);
     return err;
 }
