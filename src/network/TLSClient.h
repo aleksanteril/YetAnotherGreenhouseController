@@ -39,7 +39,6 @@ private:
     
     static constexpr int BUF_SIZE{4096};
     char buffer[BUF_SIZE];
-    int rd;
     int count;
 
     char* req;

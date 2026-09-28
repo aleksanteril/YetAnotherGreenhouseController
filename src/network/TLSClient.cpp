@@ -11,7 +11,7 @@
 #define DEBUG_printf
 
 TLSClient::TLSClient(const char *ssid, const char *pw)
-    : tls_config(nullptr), pcb(nullptr), count(0), rd(0), to_notify(nullptr) {
+    : tls_config(nullptr), pcb(nullptr), count(0), to_notify(nullptr) {
 
     if (cyw43_arch_init()) {
         DEBUG_printf("failed to initialise\n");
@@ -95,7 +95,7 @@ err_t TLSClient::tls_recv(void *arg, altcp_pcb *pcb, pbuf *p, err_t err) {
     }
     if (p->tot_len > 0) {
         DEBUG_printf("received %dB\n", p->tot_len);
-        int write_pos = self->rd + self->count;
+        int write_pos = self->count;
         int space = BUF_SIZE - write_pos;
         int to_copy = p->tot_len < space ? p->tot_len : space;
         if (to_copy > 0) {
@@ -131,7 +131,6 @@ int TLSClient::connect(const char *hostname, int port=443, int timeout_ms=15000)
     // but this is only used in 1 task that waits for the lwIP task to complete
     // so be it
     count = 0;
-    rd = 0;
     to_notify = xTaskGetCurrentTaskHandle();
 
     altcp_arg(pcb, this);
