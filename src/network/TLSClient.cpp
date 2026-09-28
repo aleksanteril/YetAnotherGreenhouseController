@@ -7,8 +7,8 @@
 #include "lwip/dns.h"
 #include "mbedtls/ssl.h"
 
-#define DEBUG_printf printf
-//#define DEBUG_printf
+//#define DEBUG_printf printf
+#define DEBUG_printf
 
 TLSClient::TLSClient(const char *ssid, const char *pw)
     : tls_config(nullptr), pcb(nullptr), count(0), to_notify(nullptr) {
