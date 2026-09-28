@@ -48,9 +48,9 @@ startup_task(void* param)
         xTaskCreate(ui_task, "UI", 
                 320, (void*)&e, tskIDLE_PRIORITY + 1, nullptr);
         xTaskCreate(controller_task, "CONTROLLER", 
-                256, (void*)&e, tskIDLE_PRIORITY + 2, nullptr);
+                256, nullptr, tskIDLE_PRIORITY + 2, nullptr);
         xTaskCreate(network_task, "NETWORK",
-                4096, nullptr, tskIDLE_PRIORITY + 1, NULL);
+                4096, (void*)&e, tskIDLE_PRIORITY + 1, NULL);
 
         vTaskDelete(nullptr);
 }
@@ -156,8 +156,8 @@ shell_task(void* param)
         }
 }
 
-void network_task(void *param) {
-
+void network_task(void *param) 
+{
         Cache::NetworkSetting_t wlan;
         xQueuePeek(Cache::network_mb, &wlan, portMAX_DELAY);
         TLSClient ipstack(wlan.ssid, wlan.pwd);
@@ -166,8 +166,8 @@ void network_task(void *param) {
                 .ssid = wlan.ssid,
                 .password = wlan.pwd
         };
-        // Connect over TLS (port 443) using the hostname. DNS is resolved at runtime inside IPStack, no fixed server IP is needed
-        ThingSpeakClient client(ipstack, cfg, THINGSPEAK_HOST, 443);
+        // Connect over HTTPS port 443 using the hostname.
+        ThingSpeakClient client(ipstack, cfg, THINGSPEAK_HOST, 443, *(EEPROM*)param);
         for(;;) {
                 // send every 30s
                 vTaskDelay(pdMS_TO_TICKS(30'000));
@@ -185,6 +185,7 @@ void network_task(void *param) {
                 data.fan_percent = 0; // right now unused
 
                 // Push measurements to the cloud.
+                // get talkback command if any at the same time
                 if (!client.send_update(data)) {
                         // try to reconnect
                         for(int tries{}; tries < 5; ++tries) {

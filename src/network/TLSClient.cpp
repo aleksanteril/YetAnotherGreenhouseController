@@ -7,11 +7,11 @@
 #include "lwip/dns.h"
 #include "mbedtls/ssl.h"
 
-//#define DEBUG_printf printf
-#define DEBUG_printf
+#define DEBUG_printf printf
+//#define DEBUG_printf
 
 TLSClient::TLSClient(const char *ssid, const char *pw)
-    : tls_config(nullptr), pcb(nullptr), count(0), rd(0), connected(false), closed(false), dns_done(false) {
+    : tls_config(nullptr), pcb(nullptr), count(0), rd(0), to_notify(nullptr) {
 
     if (cyw43_arch_init()) {
         DEBUG_printf("failed to initialise\n");
@@ -35,7 +35,7 @@ TLSClient::TLSClient(const char *ssid, const char *pw)
 }
 
 TLSClient::~TLSClient() {
-    disconnect();
+    tls_disconnect(this);
     if (tls_config) {
         altcp_tls_free_config(tls_config);
         tls_config = nullptr;
@@ -46,16 +46,25 @@ int TLSClient::reconnect_wifi(const char *ssid, const char *pw) {
     return cyw43_arch_wifi_connect_timeout_ms(ssid, pw, CYW43_AUTH_WPA2_AES_PSK, 30000);
 }
 
+void 
+TLSClient::tls_connect_to_server_ip(const ip_addr_t *ipaddr, void *arg)
+{
+    auto *self = static_cast<TLSClient *>(arg);
+    DEBUG_printf("connecting to server IP %s port %d\n", ipaddr_ntoa(ipaddr), 443);
+    err_t err = altcp_connect(self->pcb, ipaddr, (u16_t)443, tls_connected);
+    if (err != ERR_OK)
+    {
+        DEBUG_printf("error initiating connect, err=%d\n", err);
+        tls_disconnect(self);
+    }
+}
 
 void TLSClient::dns_found(const char *name, const ip_addr_t *ipaddr, void *arg) {
     (void)name;
     auto *self = static_cast<TLSClient *>(arg);
     if (ipaddr) {
-        self->remote_addr = *ipaddr;
-    } else {
-        self->closed = true;
+        tls_connect_to_server_ip(ipaddr, arg);
     }
-    self->dns_done = true;
 }
 
 
@@ -63,10 +72,14 @@ err_t TLSClient::tls_connected(void *arg, altcp_pcb *pcb, err_t err) {
     (void)pcb;
     auto *self = static_cast<TLSClient *>(arg);
     if (err != ERR_OK) {
-        self->closed = true;
-        return err;
+        // connection fail
+        return tls_disconnect(arg);
     }
-    self->connected = true;
+    err = altcp_write(self->pcb, self->req, self->req_s, TCP_WRITE_FLAG_COPY);
+    if (err != ERR_OK) {
+        DEBUG_printf("error writing data, err=%d", err);
+        return tls_disconnect(arg);
+    }
     return ERR_OK;
 }
 
@@ -74,7 +87,7 @@ err_t TLSClient::tls_recv(void *arg, altcp_pcb *pcb, pbuf *p, err_t err) {
     (void)err;
     auto *self = static_cast<TLSClient *>(arg);
     if (!p) {
-        self->closed = true;
+        tls_disconnect(arg);
         return ERR_OK;
     }
     if (p->tot_len > 0) {
@@ -92,34 +105,30 @@ err_t TLSClient::tls_recv(void *arg, altcp_pcb *pcb, pbuf *p, err_t err) {
 }
 
 err_t TLSClient::tls_poll(void *arg, altcp_pcb *pcb) {
-    (void)pcb;
-    (void)arg;
-    return ERR_OK;
+    return tls_disconnect(arg);
 }
 
 void TLSClient::tls_err(void *arg, err_t err) {
-    (void)err;
-    auto *self = static_cast<TLSClient *>(arg);
-    self->pcb = nullptr; // already freed by lwIP
-    self->closed = true;
+    tls_disconnect(arg);
 }
 
-int TLSClient::connect(const char *hostname, int port) {
+int TLSClient::connect(const char *hostname, int port=443, int timeout_ms=15000) {
     if (!tls_config) {
         return -1;
     }
-
-    count = 0;
-    rd = 0;
-    connected = false;
-    closed = false;
-    dns_done = false;
 
     pcb = altcp_tls_new(tls_config, IPADDR_TYPE_ANY);
     if (!pcb) {
         DEBUG_printf("failed to create pcb\n");
         return -2;
     }
+
+    // if this would be used from many tasks, we need a mutex here 
+    // but this is only used in 1 task that waits for the lwIP task to complete
+    // so be it
+    count = 0;
+    rd = 0;
+    to_notify = xTaskGetCurrentTaskHandle();
 
     altcp_arg(pcb, this);
     altcp_recv(pcb, tls_recv);
@@ -131,74 +140,39 @@ int TLSClient::connect(const char *hostname, int port) {
 
     // DNS resolve
     cyw43_arch_lwip_begin();
-    err_t err = dns_gethostbyname(hostname, &remote_addr, dns_found, this);
-    cyw43_arch_lwip_end();
 
+    err_t err = dns_gethostbyname(hostname, &remote_addr, dns_found, this);
     if (err == ERR_OK) {
-        dns_done = true; // cached
+        tls_connect_to_server_ip(&remote_addr, this);
     } else if (err != ERR_INPROGRESS) {
         DEBUG_printf("DNS error %d\n", err);
-        disconnect();
+        tls_disconnect(this);
         return -3;
     }
 
-    absolute_time_t to = make_timeout_time_ms(10000);
-    while (!dns_done && !time_reached(to)) {
-        cyw43_arch_poll();
-    }
-    if (!dns_done || closed) {
-        DEBUG_printf("DNS resolve failed for %s\n", hostname);
-        disconnect();
-        return -4;
-    }
-
-    cyw43_arch_lwip_begin();
-    err = altcp_connect(pcb, &remote_addr, (u16_t)port, tls_connected);
     cyw43_arch_lwip_end();
-    if (err != ERR_OK) {
-        DEBUG_printf("altcp_connect error %d\n", err);
-        disconnect();
-        return -5;
-    }
 
-    to = make_timeout_time_ms(15000);
-    while (!connected && !closed && !time_reached(to)) {
-        cyw43_arch_poll();
-    }
-    if (!connected || closed) {
-        DEBUG_printf("TLS handshake failed\n");
-        disconnect();
-        return -6;
+    // wait for connection to close
+    auto timeout{ pdMS_TO_TICKS(timeout_ms) };
+    if (ulTaskNotifyTake(pdTRUE, portMAX_DELAY) == 0) {
+        // timed out
+        DEBUG_printf("connect timeout %d\n", err);
+        tls_disconnect(this);
+        return -4;
     }
 
     return 0;
 }
 
 
-int TLSClient::write(unsigned char *buffer, int len, int timeout) {
-    (void)timeout;
-    if (!pcb || !connected || closed) {
-        return -1;
-    }
-    cyw43_arch_lwip_begin();
-    err_t err = altcp_write(pcb, buffer, (u16_t)len, TCP_WRITE_FLAG_COPY);
-    if (err == ERR_OK) {
-        err = altcp_output(pcb);
-    }
-    cyw43_arch_lwip_end();
-    if (err != ERR_OK) {
-        DEBUG_printf("altcp_write error %d\n", err);
-        return -2;
-    }
+int TLSClient::write(char *buffer, int len) {
+    req = buffer;
+    req_s = len;
     return len;
 }
 
 
-int TLSClient::read(unsigned char *buffer, int len, int timeout) {
-    absolute_time_t to = make_timeout_time_ms(timeout);
-    while (count == 0 && !closed && !time_reached(to)) {
-        cyw43_arch_poll();
-    }
+int TLSClient::read(char *buffer, int len) {
     int to_copy = count < len ? count : len;
     if (to_copy > 0) {
         std::memcpy(buffer, this->buffer + rd, to_copy);
@@ -211,24 +185,25 @@ int TLSClient::read(unsigned char *buffer, int len, int timeout) {
     return to_copy;
 }
 
-
-int TLSClient::disconnect() {
+err_t TLSClient::tls_disconnect(void* arg) {
+    auto *self = static_cast<TLSClient *>(arg);
+    err_t err = ERR_OK;
+    DEBUG_printf("deleting pcb\n");
+    // give signal connection closing
+    xTaskNotifyGive(self->to_notify);
     cyw43_arch_lwip_begin();
-    if (pcb != nullptr) {
-        altcp_arg(pcb, nullptr);
-        altcp_recv(pcb, nullptr);
-        altcp_poll(pcb, nullptr, 0);
-        altcp_err(pcb, nullptr);
-        err_t err = altcp_close(pcb);
+    if (self->pcb != nullptr) {
+        altcp_arg(self->pcb, nullptr);
+        altcp_recv(self->pcb, nullptr);
+        altcp_poll(self->pcb, nullptr, 0);
+        altcp_err(self->pcb, nullptr);
+        err_t err = altcp_close(self->pcb);
         if (err != ERR_OK) {
-            altcp_abort(pcb);
+            err = ERR_ABRT;
+            altcp_abort(self->pcb);
         }
-        pcb = nullptr;
+        self->pcb = nullptr;
     }
     cyw43_arch_lwip_end();
-    connected = false;
-    closed = false;
-    count = 0;
-    rd = 0;
-    return 0;
+    return err;
 }
