@@ -53,8 +53,10 @@ class UI_Display {
 
         
         int ch{ 'a' };
-        std::array<char, 33> ssid{};
-        std::array<char, 64> password{};
+        Cache::NetworkSetting_t wlan_buf {
+                .ssid = "",
+                .pwd = ""
+        };
         void
         set_network(enum intEvent);
         void
