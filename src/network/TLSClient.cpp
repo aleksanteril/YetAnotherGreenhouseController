@@ -65,8 +65,8 @@ TLSClient::tls_connect_to_server_ip(const ip_addr_t *ipaddr, void *arg)
 }
 
 void TLSClient::dns_found(const char *name, const ip_addr_t *ipaddr, void *arg) {
-    (void)name;
     auto *self = static_cast<TLSClient *>(arg);
+    DEBUG_printf("DNS found %s @ %s\n", name, ipaddr_ntoa(ipaddr));
     if (ipaddr) {
         tls_connect_to_server_ip(ipaddr, arg);
     } else {
@@ -77,13 +77,12 @@ void TLSClient::dns_found(const char *name, const ip_addr_t *ipaddr, void *arg) 
 
 
 err_t TLSClient::tls_connected(void *arg, altcp_pcb *pcb, err_t err) {
-    (void)pcb;
     auto *self = static_cast<TLSClient *>(arg);
     if (err != ERR_OK) {
         // connection fail
         return tls_disconnect(arg);
     }
-    err = altcp_write(self->pcb, self->req, self->req_s, TCP_WRITE_FLAG_COPY);
+    err = altcp_write(pcb, self->req, self->req_s, TCP_WRITE_FLAG_COPY);
     if (err != ERR_OK) {
         DEBUG_printf("error writing data, err=%d", err);
         return tls_disconnect(arg);
@@ -92,7 +91,6 @@ err_t TLSClient::tls_connected(void *arg, altcp_pcb *pcb, err_t err) {
 }
 
 err_t TLSClient::tls_recv(void *arg, altcp_pcb *pcb, pbuf *p, err_t err) {
-    (void)err;
     auto *self = static_cast<TLSClient *>(arg);
     if (!p) {
         tls_disconnect(arg);
@@ -114,10 +112,14 @@ err_t TLSClient::tls_recv(void *arg, altcp_pcb *pcb, pbuf *p, err_t err) {
 }
 
 err_t TLSClient::tls_poll(void *arg, altcp_pcb *pcb) {
+    DEBUG_printf("client poll\n");
     return tls_disconnect(arg);
 }
 
 void TLSClient::tls_err(void *arg, err_t err) {
+    DEBUG_printf("client error %d", err);
+    auto *self = static_cast<TLSClient *>(arg);
+    self->pcb = nullptr;
     tls_disconnect(arg);
 }
 
@@ -151,6 +153,7 @@ int TLSClient::connect(const char *hostname, int port=443, int timeout_ms=15000)
 
     err_t err = dns_gethostbyname(hostname, &remote_addr, dns_found, this);
     if (err == ERR_OK) {
+        DEBUG_printf("DNS cached entry\n");
         tls_connect_to_server_ip(&remote_addr, this);
     } else if (err != ERR_INPROGRESS) {
         DEBUG_printf("DNS error %d\n", err);
@@ -165,7 +168,7 @@ int TLSClient::connect(const char *hostname, int port=443, int timeout_ms=15000)
     if (ulTaskNotifyTake(pdTRUE, timeout) == 0) {
         // timed out
         DEBUG_printf("connect timeout %d\n", err);
-        tls_disconnect(this);
+        //tls_disconnect(this);
         return -4;
     }
 
@@ -200,7 +203,7 @@ err_t TLSClient::tls_disconnect(void* arg) {
         altcp_recv(self->pcb, nullptr);
         altcp_poll(self->pcb, nullptr, 0);
         altcp_err(self->pcb, nullptr);
-        err_t err = altcp_close(self->pcb);
+        err = altcp_close(self->pcb);
         if (err != ERR_OK) {
             err = ERR_ABRT;
             altcp_abort(self->pcb);

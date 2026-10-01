@@ -6,6 +6,9 @@
 #include <optional>
 #include "constants.hpp"
 #include <sensors.hpp>
+#include <cmath>
+
+#include "hardware/watchdog.h"
 
 using namespace Display;
 
@@ -63,9 +66,11 @@ UI_Display::UI_Display(EEPROM& e)
                 ROT_A_PIN, GPIO_IRQ_EDGE_FALL, true, callback_irq);
         xEventGroupSetBits(sw_tasks, PROCEED);
         xTaskCreate(button_task, "BUTTON_SW0", 64, 
-                (void*)SW0_PIN, tskIDLE_PRIORITY + 2, nullptr);
+                (void*)SW0_PIN, tskIDLE_PRIORITY + 1, nullptr);
+        xTaskCreate(button_task, "BUTTON_SW0", 64, 
+                (void*)SW1_PIN, tskIDLE_PRIORITY + 1, nullptr);
         xTaskCreate(button_task, "BUTTON_SW2", 64, 
-                (void*)SW2_PIN, tskIDLE_PRIORITY + 2, nullptr);
+                (void*)SW2_PIN, tskIDLE_PRIORITY + 1, nullptr);
         change_state_to(&UI_Display::menu);
 }
 
@@ -158,7 +163,11 @@ static void
 handle_var(Event ev, int& val, int min, int max)
 {
         (ev == RIGHT) ? (++val) : (--val);
-        val = (val < min) ? (max) : (val % (max+1));
+        if(val < min) {
+                val = max;
+        } else if(val > max) {
+                val = min;
+        }
 }
 
 // helper function for similar ipv4 and setpoint setting
@@ -189,21 +198,130 @@ save_valid_setpoint(EEPROM& e, std::span<int> vals)
 }
 
 void
+handle_draw_selector(ssd1306os& display, char ch)
+{
+        display.rect(0, 48, 128, 8, 0, true);
+        display.text("^", 60, 58, 1);
+        char l_ch = ch == 32 ? 126 : ch-1;
+        char r_ch = ch == 126 ? 32 : ch+1;
+        char ll_ch = l_ch == 32 ? 126 : l_ch-1;
+        char rr_ch = r_ch == 126 ? 32 : r_ch+1;
+        std::string selector{ ll_ch, ' ', l_ch, ' ', ch, ' ', r_ch, ' ', rr_ch };
+        display.text(selector, 28, 48, 1);
+        display.show();
+}
+
+void
+handle_draw_rows(ssd1306os& display, char* msg)
+{
+        // max 4 rows, this is used in set network and ssid
+        display.rect(0, 16, 128, 32, 0, true);
+        size_t rows{ (size_t)std::ceil(strlen(msg) / 16.0) };
+        for(int i{}; i < rows; ++i) {
+                display.text(msg+(16*i), 0, 16+(8*i), 1);
+        }
+        display.show();
+}
+
+void
+UI_Display::set_password(enum intEvent _e)
+{
+        switch(_e) {
+        case Enter:
+                menu_i = 0; // Repurpose this variable
+                ch = 'a';
+                *wlan_buf.pwd = '\0';
+                display.fill(0);
+                display.text("SET PASSWORD", 12, 0, 1);
+                handle_draw_selector(display, (char)ch);
+                xTimerReset(inact_t, 0);
+                break;
+        case Loop:
+                switch(ev) {
+                case RIGHT:
+                case LEFT:
+                        xTimerReset(inact_t, 0);
+                        handle_var(ev, ch, 32, 126);
+                        handle_draw_selector(display, (char)ch);
+                        break;
+                case PRESS_SW0:
+                        xTimerReset(inact_t, 0);
+                        if(menu_i < 63) {
+                                wlan_buf.pwd[menu_i] = (char)ch;
+                                wlan_buf.pwd[++menu_i] = '\0';
+                                handle_draw_rows(display, wlan_buf.pwd);
+                        }
+                        break;
+                case PRESS_SW1:
+                        xTimerReset(inact_t, 0);
+                        if(menu_i > 0) {
+                                wlan_buf.pwd[--menu_i] = '\0';
+                                handle_draw_rows(display, wlan_buf.pwd);
+                        }
+                        break;
+                case PRESS_SW2:
+                        xTimerReset(inact_t, 0);
+                        if (!eeprom.save_network(wlan_buf)) {
+                                display.fill(0);
+                                display.text("Local value set.", 0, 0, 1);
+                                display.text("EEPROM Save fail!", 0, 9, 1);
+                                display.show();
+                                change_state_to(&UI_Display::wait);
+                        }
+                        watchdog_reboot(0, 0, 1000);
+                        break;
+                case INACTIVE:
+                        change_state_to(&UI_Display::status);
+                        break;
+                }
+                break;
+        }
+}
+
+void
 UI_Display::set_network(enum intEvent _e)
 {
         switch(_e) {
         case Enter:
+                menu_i = 0; // Repurpose this variable
+                ch = 'a';
+                *wlan_buf.ssid = '\0';
                 display.fill(0);
-                display.text("SET NETWORK", 9, 0, 1);
-                display.show();
+                display.text("SET SSID", 28, 0, 1);
+                handle_draw_selector(display, (char)ch);
                 xTimerReset(inact_t, 0);
                 break;
         case Loop:
-                if(ev == INACTIVE) {
+                switch(ev) {
+                case RIGHT:
+                case LEFT:
+                        xTimerReset(inact_t, 0);
+                        handle_var(ev, ch, 32, 126);
+                        handle_draw_selector(display, (char)ch);
+                        break;
+                case PRESS_SW0:
+                        xTimerReset(inact_t, 0);
+                        if(menu_i < 32) {
+                                wlan_buf.ssid[menu_i] = (char)ch;
+                                wlan_buf.ssid[++menu_i] = '\0';
+                                handle_draw_rows(display, wlan_buf.ssid);
+                        }
+                        break;
+                case PRESS_SW1:
+                        xTimerReset(inact_t, 0);
+                        if(menu_i > 0) {
+                                wlan_buf.ssid[--menu_i] = '\0';
+                                handle_draw_rows(display, wlan_buf.ssid);
+                        }
+                        break;
+                case PRESS_SW2:
+                        xTimerReset(inact_t, 0);
+                        change_state_to(&UI_Display::set_password);
+                        break;
+                case INACTIVE:
                         change_state_to(&UI_Display::status);
+                        break;
                 }
-                break;
-        case Exit:
                 break;
         }
 }

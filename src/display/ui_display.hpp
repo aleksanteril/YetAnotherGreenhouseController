@@ -51,8 +51,16 @@ class UI_Display {
         void
         set_target(enum intEvent);
 
+        
+        int ch{ 'a' };
+        Cache::NetworkSetting_t wlan_buf {
+                .ssid = "",
+                .pwd = ""
+        };
         void
         set_network(enum intEvent);
+        void
+        set_password(enum intEvent);
         
         int menu_i{};
         const std::array<State, 3> items{ &UI_Display::info, 
