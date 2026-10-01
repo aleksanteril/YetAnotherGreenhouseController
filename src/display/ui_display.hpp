@@ -51,8 +51,14 @@ class UI_Display {
         void
         set_target(enum intEvent);
 
+        
+        int ch{ 'a' };
+        std::array<char, 33> ssid{};
+        std::array<char, 64> password{};
         void
         set_network(enum intEvent);
+        void
+        set_password(enum intEvent);
         
         int menu_i{};
         const std::array<State, 3> items{ &UI_Display::info, 

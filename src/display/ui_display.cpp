@@ -7,6 +7,8 @@
 #include "constants.hpp"
 #include <sensors.hpp>
 
+#include "hardware/watchdog.h"
+
 using namespace Display;
 
 QueueHandle_t Display::Event_q{ nullptr };
@@ -63,9 +65,11 @@ UI_Display::UI_Display(EEPROM& e)
                 ROT_A_PIN, GPIO_IRQ_EDGE_FALL, true, callback_irq);
         xEventGroupSetBits(sw_tasks, PROCEED);
         xTaskCreate(button_task, "BUTTON_SW0", 64, 
-                (void*)SW0_PIN, tskIDLE_PRIORITY + 2, nullptr);
+                (void*)SW0_PIN, tskIDLE_PRIORITY + 1, nullptr);
+        xTaskCreate(button_task, "BUTTON_SW0", 64, 
+                (void*)SW1_PIN, tskIDLE_PRIORITY + 1, nullptr);
         xTaskCreate(button_task, "BUTTON_SW2", 64, 
-                (void*)SW2_PIN, tskIDLE_PRIORITY + 2, nullptr);
+                (void*)SW2_PIN, tskIDLE_PRIORITY + 1, nullptr);
         change_state_to(&UI_Display::menu);
 }
 
@@ -158,7 +162,11 @@ static void
 handle_var(Event ev, int& val, int min, int max)
 {
         (ev == RIGHT) ? (++val) : (--val);
-        val = (val < min) ? (max) : (val % (max+1));
+        if(val < min) {
+                val = max;
+        } else if(val > max) {
+                val = min;
+        }
 }
 
 // helper function for similar ipv4 and setpoint setting
@@ -189,21 +197,142 @@ save_valid_setpoint(EEPROM& e, std::span<int> vals)
 }
 
 void
-UI_Display::set_network(enum intEvent _e)
+handle_draw_password(ssd1306os& display, char* password)
+{
+        display.rect(0, 16, 128, 32, 0, true);
+        display.text(password, 0, 16, 1);
+        size_t len{ strlen(password) };
+        if(len > 16) {
+                display.text(password+16, 0, 24, 1);    
+        }
+        if(len > 32) {
+                display.text(password+32, 0, 32, 1);     
+        }
+        if(len > 48) {
+                display.text(password+48, 0, 40, 1);     
+        }
+        display.show();
+}
+
+void
+UI_Display::set_password(enum intEvent _e)
 {
         switch(_e) {
         case Enter:
+                menu_i = 0; // Repurpose this variable
+                ch = 'a';
                 display.fill(0);
-                display.text("SET NETWORK", 9, 0, 1);
+                display.text("SET PASSWORD", 12, 0, 1);
+                display.text(std::string(1, (char)ch), 60, 56, 1);
                 display.show();
                 xTimerReset(inact_t, 0);
                 break;
         case Loop:
-                if(ev == INACTIVE) {
+                switch(ev) {
+                case RIGHT:
+                case LEFT:
+                        xTimerReset(inact_t, 0);
+                        handle_var(ev, ch, 32, 126);
+                        display.rect(0, 56, 128, 8, 0, true);
+                        display.text(std::string(1, (char)ch), 60, 56, 1);
+                        display.show();
+                        break;
+                case PRESS_SW0:
+                        xTimerReset(inact_t, 0);
+                        if(menu_i < 63) {
+                                password[menu_i] = (char)ch;
+                                password[++menu_i] = '\0';
+                                handle_draw_password(display, password.data());
+                        }
+                        break;
+                case PRESS_SW1:
+                        xTimerReset(inact_t, 0);
+                        if(menu_i > 0) {
+                                password[--menu_i] = '\0';
+                                handle_draw_password(display, password.data());
+                        }
+                        break;
+                case PRESS_SW2:
+                        xTimerReset(inact_t, 0);
+                        {
+                        Cache::NetworkSetting_t wlan;
+                        std::memcpy(wlan.ssid, ssid.data(), ssid.size());
+                        std::memcpy(wlan.pwd, password.data(), password.size());
+                        if (!eeprom.save_network(wlan)) {
+                                display.fill(0);
+                                display.text("Local value set.", 0, 0, 1);
+                                display.text("EEPROM Save fail!", 0, 9, 1);
+                                display.show();
+                                change_state_to(&UI_Display::wait);
+                        }
+                        }
+                        watchdog_reboot(0, 0, 1000);
+                        break;
+                case INACTIVE:
                         change_state_to(&UI_Display::status);
+                        break;
                 }
                 break;
-        case Exit:
+        }
+}
+
+void
+handle_draw_ssid(ssd1306os& display, char* ssid)
+{
+        display.rect(0, 16, 128, 16, 0, true);
+        display.text(ssid, 0, 16, 1);
+        if(strlen(ssid) > 16) {
+                display.text(ssid+16, 0, 24, 1); 
+        }
+        display.show();
+}
+
+void
+UI_Display::set_network(enum intEvent _e)
+{
+        switch(_e) {
+        case Enter:
+                menu_i = 0; // Repurpose this variable
+                ch = 'a';
+                display.fill(0);
+                display.text("SET SSID", 28, 0, 1);
+                display.text(std::string(1, (char)ch), 60, 56, 1);
+                display.show();
+                xTimerReset(inact_t, 0);
+                break;
+        case Loop:
+                switch(ev) {
+                case RIGHT:
+                case LEFT:
+                        xTimerReset(inact_t, 0);
+                        handle_var(ev, ch, 32, 126);
+                        display.rect(0, 56, 128, 8, 0, true);
+                        display.text(std::string(1, (char)ch), 60, 56, 1);
+                        display.show();
+                        break;
+                case PRESS_SW0:
+                        xTimerReset(inact_t, 0);
+                        if(menu_i < 32) {
+                                ssid[menu_i] = (char)ch;
+                                ssid[++menu_i] = '\0';
+                                handle_draw_ssid(display, ssid.data());
+                        }
+                        break;
+                case PRESS_SW1:
+                        xTimerReset(inact_t, 0);
+                        if(menu_i > 0) {
+                                ssid[--menu_i] = '\0';
+                                handle_draw_ssid(display, ssid.data());
+                        }
+                        break;
+                case PRESS_SW2:
+                        xTimerReset(inact_t, 0);
+                        change_state_to(&UI_Display::set_password);
+                        break;
+                case INACTIVE:
+                        change_state_to(&UI_Display::status);
+                        break;
+                }
                 break;
         }
 }
