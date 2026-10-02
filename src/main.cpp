@@ -46,7 +46,7 @@ startup_task(void* param)
         xTaskCreate(shell_task, "SHELL",
                 392, (void*)&e, tskIDLE_PRIORITY + 1, nullptr);
         xTaskCreate(ui_task, "UI", 
-                320, (void*)&e, tskIDLE_PRIORITY + 1, nullptr);
+                392, (void*)&e, tskIDLE_PRIORITY + 1, nullptr);
         xTaskCreate(controller_task, "CONTROLLER", 
                 256, nullptr, tskIDLE_PRIORITY + 2, nullptr);
         xTaskCreate(network_task, "NETWORK",
