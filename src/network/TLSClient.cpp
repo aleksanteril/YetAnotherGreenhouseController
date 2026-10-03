@@ -138,6 +138,7 @@ int TLSClient::connect(const char *hostname, int port=443, int timeout_ms=15000)
     // but this is only used in 1 task that waits for the lwIP task to complete
     // so be it
     xTaskNotifyStateClear(nullptr);
+    ulTaskNotifyValueClear(nullptr, UINT_MAX);
     count = 0;
     to_notify = xTaskGetCurrentTaskHandle();
 
