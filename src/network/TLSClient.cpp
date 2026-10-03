@@ -137,6 +137,7 @@ int TLSClient::connect(const char *hostname, int port=443, int timeout_ms=15000)
     // if this would be used from many tasks, we need a mutex here 
     // but this is only used in 1 task that waits for the lwIP task to complete
     // so be it
+    xTaskNotifyStateClear(nullptr);
     count = 0;
     to_notify = xTaskGetCurrentTaskHandle();
 
@@ -168,7 +169,6 @@ int TLSClient::connect(const char *hostname, int port=443, int timeout_ms=15000)
     if (ulTaskNotifyTake(pdTRUE, timeout) == 0) {
         // timed out
         DEBUG_printf("connect timeout %d\n", err);
-        //tls_disconnect(this);
         return -4;
     }
 
