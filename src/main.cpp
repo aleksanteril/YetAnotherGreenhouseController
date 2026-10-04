@@ -100,7 +100,7 @@ controller_task(void* param)
         // spin-off temp and rh measuring to another task
         // as this needs to be run much less frequently
         xTaskCreate(temp_rh_task, "TEMP & RH", 
-                128, (void*)&uart_ptr, tskIDLE_PRIORITY + 1, nullptr);
+                256, (void*)&uart_ptr, tskIDLE_PRIORITY + 1, nullptr);
         
         GMP252 gmp(rtu);
         PRODUAL fan(rtu);
