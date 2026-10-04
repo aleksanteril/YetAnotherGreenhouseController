@@ -71,7 +71,8 @@ main()
 void
 temp_rh_task(void* param)
 {
-        auto rtu{ *(std::shared_ptr<ModbusClient>*)param };
+        auto uart_ptr{ *(std::shared_ptr<PicoOsUart>*)param };
+        auto rtu{ std::make_shared<ModbusClient>(uart_ptr) };
         HMP60 hmp(rtu);
         int time_ms{ 60'000 }; // 1minute
 
@@ -95,11 +96,11 @@ controller_task(void* param)
 {
         auto uart_ptr{ std::make_shared<PicoOsUart>(1, 
                 UART1_TX_PIN, UART1_RX_PIN, UART1_BAUD, 2) };
-        auto rtu{std::make_shared<ModbusClient>(uart_ptr)};
+        auto rtu{ std::make_shared<ModbusClient>(uart_ptr) };
         // spin-off temp and rh measuring to another task
         // as this needs to be run much less frequently
         xTaskCreate(temp_rh_task, "TEMP & RH", 
-                128, (void*)&rtu, tskIDLE_PRIORITY + 1, nullptr);
+                128, (void*)&uart_ptr, tskIDLE_PRIORITY + 1, nullptr);
         
         GMP252 gmp(rtu);
         PRODUAL fan(rtu);
