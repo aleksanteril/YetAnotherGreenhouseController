@@ -32,7 +32,7 @@ namespace Cache
 /* EEPROM 0x50 is the only device used on i2c0 */
 class EEPROM : private PicoI2C {
         public:
-                EEPROM(uint bus_nr=0);
+                explicit EEPROM(uint bus_nr=0);
                 EEPROM(const EEPROM&) = delete;
                 bool 
                 save_setpoint(uint16_t setpoint);

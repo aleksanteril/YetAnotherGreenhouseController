@@ -15,6 +15,7 @@
 class TLSClient {
 public:
     TLSClient(const char *ssid, const char *pw);
+    TLSClient(const TLSClient&) = delete;
     ~TLSClient();
 
     int reconnect_wifi(const char *ssid, const char *pw);
