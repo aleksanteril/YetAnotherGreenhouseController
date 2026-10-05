@@ -160,9 +160,8 @@ CO2_Valve::set_output(int percent)
 {
         if(percent <= 0) {
                 xTimerStop(tmr, 0);
-                //close();
                 return;
-        } 
+        }
         if(percent <= 10) {
                 // min 1s of co2
                 percent = 10;
@@ -172,6 +171,8 @@ CO2_Valve::set_output(int percent)
         }
         open_ms = percent*100;
         if(xTimerIsTimerActive(tmr) == pdFALSE) {
+                // force first callback through here, occurs 30s -> onwards
+                valve_timer(tmr);
                 xTimerStart(tmr, 0);
         }
 }

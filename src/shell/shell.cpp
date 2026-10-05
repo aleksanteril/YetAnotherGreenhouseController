@@ -12,11 +12,11 @@ bool
 unallowed_ascii(uint8_t* ptr) {
         uint8_t ch{ *ptr };
         bool res{};
-        if(ch >= 128 || ch <= 255) {
+        if(ch >= 128 && ch <= 255) {
                 // allow nordics etc, extended ascii
                 return false;
         }
-        return (ch < 32 || ch > 127);
+        return (ch < 32 || ch > 126);
 }
 
 static inline std::optional<int>

@@ -26,7 +26,7 @@ namespace Sensors
 // humidity and temp sensor
 class HMP60 {
       public:
-        HMP60(std::shared_ptr<ModbusClient> client_);
+        explicit HMP60(std::shared_ptr<ModbusClient> client_);
         HMP60(const HMP60&) = delete;
         double
         read_rh();
@@ -41,7 +41,7 @@ class HMP60 {
 // co2 sensor
 class GMP252 {
       public:
-        GMP252(std::shared_ptr<ModbusClient> client_);
+        explicit GMP252(std::shared_ptr<ModbusClient> client_);
         GMP252(const GMP252&) = delete;
         uint16_t
         read_co2();
@@ -52,7 +52,7 @@ class GMP252 {
 // fan control
 class PRODUAL {
       public:
-        PRODUAL(std::shared_ptr<ModbusClient> client_);
+        explicit PRODUAL(std::shared_ptr<ModbusClient> client_);
         PRODUAL(const PRODUAL&) = delete;
         int
         read_counter();
