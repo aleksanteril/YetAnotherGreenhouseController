@@ -107,7 +107,7 @@ controller_task(void* param)
         CO2_Valve valve;
 
         int sp{};
-        P_Controller pid_valve(valve, sp, 0.05);
+        P_Controller pid_valve(valve, sp, 0.08);
         bool fan_enable{};
         P_Controller pid_fan(fan, sp, 2, false);
         Display::Event updt{ Display::UPDATE };
