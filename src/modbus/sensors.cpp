@@ -110,9 +110,9 @@ PRODUAL::set_output(int percent)
 {
         if(percent <= 0) {
                 percent = 0;
-        } else if(percent <= 20) {
+        } else if(percent <= 10) {
                 // minimum speed to turn the fan
-                percent = 20;
+                percent = 10;
         } else if(percent >= 100) {
                 percent = 100;
         }
