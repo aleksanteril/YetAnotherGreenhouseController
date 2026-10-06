@@ -108,7 +108,7 @@ controller_task(void* param)
         int sp{};
         P_Controller pid_valve(valve, sp, 0.08);
         bool fan_enable{};
-        P_Controller pid_fan(fan, sp, 1, false);
+        P_Controller pid_fan(fan, sp, 0.3, false);
         Display::Event updt{ Display::UPDATE };
         for(;;) {
                 vTaskDelay(pdMS_TO_TICKS(2000));
@@ -181,8 +181,9 @@ void network_task(void *param)
                 data.temperature = packet.f64;
                 xQueuePeek(Sensors::rh_mb, &packet, 0);
                 data.humidity = packet.f64;
+                xQueuePeek(Sensors::fan_mb, &packet, 0);
+                data.fan_percent = packet.f64;
                 xQueuePeek(Cache::setpoint_mb, &data.setpoint_ppm, 0);
-                data.fan_percent = 0; // right now unused
 
                 // Push measurements to the cloud.
                 // get talkback command if any at the same time

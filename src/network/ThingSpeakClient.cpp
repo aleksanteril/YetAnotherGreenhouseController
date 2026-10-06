@@ -77,7 +77,7 @@ bool ThingSpeakClient::send_update(const ThingSpeakPacket &data) {
                 "field1=%d" 
                 "&field2=%.1lf" 
                 "&field3=%.1lf"                      
-                "&field4=%d" 
+                "&field4=%.1lf" 
                 "&field5=%d"
                 "&api_key=%s" 
                 "&talkback_key=%s",
