@@ -20,6 +20,7 @@ namespace Sensors
         extern QueueHandle_t rh_mb;
         extern QueueHandle_t temp_mb;
         extern QueueHandle_t co2_mb;
+        extern QueueHandle_t fan_mb;
 }
 
 

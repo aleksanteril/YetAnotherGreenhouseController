@@ -9,6 +9,8 @@
 #include "nanomodbus.h"
 #include "PicoOsUart.h"
 
+#include <Fmutex.h>
+
 // Wrapper class does not implement full nanomodbus API
 // addresses are wire addresses (numbering starts from zero)
 class ModbusClient {
@@ -23,6 +25,7 @@ public:
     nmbs_error write_single_register(uint16_t address, uint16_t value);
     nmbs_error write_multiple_coils(uint16_t address, uint16_t quantity, const nmbs_bitfield coils);
     nmbs_error write_multiple_registers(uint16_t address, uint16_t quantity, const uint16_t* registers);
+    Fmutex access;
 
 private:
     static int32_t uart_transport_write(const uint8_t *buf, uint16_t count, int32_t byte_timeout_ms, void *arg);
