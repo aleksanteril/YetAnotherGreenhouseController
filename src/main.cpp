@@ -71,8 +71,7 @@ main()
 void
 temp_rh_task(void* param)
 {
-        auto uart_ptr{ *(std::shared_ptr<PicoOsUart>*)param };
-        auto rtu{ std::make_shared<ModbusClient>(uart_ptr) };
+        auto rtu{ *(std::shared_ptr<ModbusClient>*)param };
         HMP60 hmp(rtu);
         int time_ms{ 60'000 }; // 1minute
 
@@ -100,7 +99,7 @@ controller_task(void* param)
         // spin-off temp and rh measuring to another task
         // as this needs to be run much less frequently
         xTaskCreate(temp_rh_task, "TEMP & RH", 
-                256, (void*)&uart_ptr, tskIDLE_PRIORITY + 1, nullptr);
+                128, (void*)&rtu, tskIDLE_PRIORITY + 1, nullptr);
         
         GMP252 gmp(rtu);
         PRODUAL fan(rtu);
@@ -109,7 +108,7 @@ controller_task(void* param)
         int sp{};
         P_Controller pid_valve(valve, sp, 0.08);
         bool fan_enable{};
-        P_Controller pid_fan(fan, sp, 2, false);
+        P_Controller pid_fan(fan, sp, 1, false);
         Display::Event updt{ Display::UPDATE };
         for(;;) {
                 vTaskDelay(pdMS_TO_TICKS(2000));
