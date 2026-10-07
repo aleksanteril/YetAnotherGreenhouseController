@@ -267,8 +267,9 @@ UI_Display::set_password(enum intEvent _e)
                                 display.text("EEPROM Save fail!", 0, 9, 1);
                                 display.show();
                                 change_state_to(&UI_Display::wait);
+                        } else {
+                                watchdog_reboot(0, 0, 1000);
                         }
-                        watchdog_reboot(0, 0, 1000);
                         break;
                 case INACTIVE:
                         change_state_to(&UI_Display::status);
@@ -457,6 +458,7 @@ UI_Display::status(enum intEvent _e)
                 } else if(ev != INACTIVE) {
                         change_state_to(&UI_Display::menu);
                 }
+                break;
         case Exit:
                 // button tasks continue
                 xEventGroupSetBits(sw_tasks, PROCEED);
