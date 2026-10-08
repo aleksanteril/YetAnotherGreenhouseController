@@ -50,7 +50,7 @@ skinparam legend {
 
 package "FreeRTOS Timers" as TIMERS {
 
-    rectangle "CO2 Valve Timer\n\n- 30 s periodic\n- started by Controller" as VALVE_TIMER <<timer>>
+    rectangle "CO2 Valve Timer\n\n- 30 s periodic\n- started by Controller\n- schedules HW alarm 1-3 s later" as VALVE_TIMER <<timer>>
 
     rectangle "UI Inactivity Timer\n\n- 15 s one-shot\n- reset by UI activity" as UI_TIMER <<timer>>
 
@@ -72,7 +72,7 @@ package "FreeRTOS IPC / Synchronization" as IPC {
 
     queue "DisplayEvent_q\nFreeRTOS queue\n\nproducers: Temp/RH, Controller,\nButtons, Rotary ISR, UI timer\nconsumer: UI" as DISPLAY_Q
 
-    queue "Sensor mailboxes\n\ntemp_mb, rh_mb, co2_mb, fan_mb\nqueue length 1 each\n\nwriters: Temp/RH, Controller\nreaders: UI, Network" as SENSOR_MB
+    queue "Sensor mailboxes\n\ntemp_mb, rh_mb, co2_mb, fan_mb\nqueue length 1 each\n\nwriters: Temp/RH (temp/rh), Controller (co2/fan)\nreaders: UI (temp/rh/co2), Network (all)" as SENSOR_MB
 
     rectangle "EEPROM event group\n\nread / write synchronization\nused internally by EEPROM" as EEPROM_EG <<sync>>
 
@@ -85,6 +85,16 @@ package "FreeRTOS IPC / Synchronization" as IPC {
 
 
 ' ============================================================
+' external service
+' ============================================================
+
+package "External Service" as EXTERNAL {
+
+    rectangle "ThingSpeak\n\n- measurement channel\n- TalkBack command queue\n- accessed by Network Task over HTTPS" as THINGSPEAK <<service>>
+}
+
+
+' ============================================================
 ' isrs
 ' ============================================================
 
@@ -92,7 +102,7 @@ package "ISRs" as ISRS {
 
     rectangle "Rotary Encoder ISR" as ROT_ISR <<isr>>
 
-    rectangle "Valve Alarm ISR" as VALVE_ISR <<isr>>
+    rectangle "Valve Alarm ISR\n\ncloses CO2 valve" as VALVE_ISR <<isr>>
 
     ROT_ISR -[hidden]right-> VALVE_ISR
 }
@@ -104,11 +114,9 @@ package "ISRs" as ISRS {
 
 package "Application Tasks" as TASKS {
 
-    rectangle "Startup Task\n\n- loads saved EEPROM settings\n- creates core tasks\n- deletes itself" as STARTUP_TASK <<task>>
+    rectangle "Controller Task\n\n- reads CO2 and setpoint\n- P-control logic\n- determines 1-3 s valve pulse\n- controls fan" as CTRL_TASK <<task>>
 
-    rectangle "Controller Task\n\n- reads CO2 and setpoint\n- P-control logic\n- controls fan and valve timing" as CTRL_TASK <<task>>
-
-    rectangle "Network Task\n\n- Wi-Fi / HTTPS / ThingSpeak\n- sends measurements every 30 s\n- polls and handles TalkBack SP commands" as NETWORK_TASK <<task>>
+    rectangle "Network Task\n\n- Wi-Fi / HTTPS / ThingSpeak\n- sends measurements every 30 s\n- handles TalkBack SP commands\n- uses network_mb" as NETWORK_TASK <<task>>
 
     rectangle "Button Tasks (3)\n\n- SW0, SW1 and SW2\n- poll push buttons\n- send UI events" as BUTTON_TASKS <<task>>
 
@@ -118,7 +126,6 @@ package "Application Tasks" as TASKS {
 
     rectangle "Shell Task\n\n- UART command interface\n- reads / changes settings" as SHELL_TASK <<task>>
 
-    STARTUP_TASK -[hidden]right-> CTRL_TASK
     CTRL_TASK -[hidden]right-> NETWORK_TASK
     NETWORK_TASK -[hidden]right-> BUTTON_TASKS
     BUTTON_TASKS -[hidden]right-> UI_TASK
@@ -135,31 +142,26 @@ package "Services / Hardware" as HW {
 
     rectangle "CO2 Valve\nGPIO27" as VALVE <<hw>>
 
+    rectangle "ModbusClient\n\nshared Modbus RTU access\nprotected by Fmutex" as MODBUS_CLIENT <<service>>
+
+    rectangle "EEPROM\nI2C0\n\npersistent setpoint / WLAN\naccessed by UI, Shell, Network" as EEPROM <<service>>
+
+    rectangle "UART0\n115200 baud" as UART <<service>>
+
     rectangle "CO2 Sensor\nModbus" as CO2_SENSOR <<hw>>
 
     rectangle "Fan Controller\nModbus" as FAN <<hw>>
 
-    rectangle "EEPROM\nI2C0" as EEPROM <<service>>
-
     rectangle "Temp / RH Sensor\nModbus" as TEMP_SENSOR <<hw>>
 
-    rectangle "UART0\n115200 baud" as UART <<service>>
+    VALVE -[hidden]right-> MODBUS_CLIENT
+    MODBUS_CLIENT -[hidden]right-> EEPROM
+    EEPROM -[hidden]right-> UART
 
-    VALVE -[hidden]right-> CO2_SENSOR
+    MODBUS_CLIENT -[hidden]down-> FAN
+
     CO2_SENSOR -[hidden]right-> FAN
-    FAN -[hidden]right-> EEPROM
-    EEPROM -[hidden]right-> TEMP_SENSOR
-    TEMP_SENSOR -[hidden]right-> UART
-}
-
-
-' ============================================================
-' external service
-' ============================================================
-
-package "External Service" as EXTERNAL {
-
-    rectangle "ThingSpeak\n\n- measurement channel\n- TalkBack command queue\n- accessed by Network Task over HTTPS" as THINGSPEAK <<service>>
+    FAN -[hidden]right-> TEMP_SENSOR
 }
 
 
@@ -168,14 +170,13 @@ package "External Service" as EXTERNAL {
 ' ============================================================
 
 TIMERS -[hidden]right-> IPC
-TIMERS -[hidden]down-> ISRS
+IPC -[hidden]right-> EXTERNAL
 
+TIMERS -[hidden]down-> ISRS
 IPC -[hidden]down-> TASKS
 TASKS -[hidden]down-> HW
 
 ISRS -[hidden]right-> HW
-
-EEPROM -[hidden]down-> THINGSPEAK
 
 
 ' ============================================================
@@ -183,28 +184,17 @@ EEPROM -[hidden]down-> THINGSPEAK
 ' ============================================================
 
 SETPOINT_MB -[hidden]down-> CTRL_TASK
-NETWORK_MB -[hidden]down-> NETWORK_TASK
 BUTTON_EG -[hidden]down-> BUTTON_TASKS
 DISPLAY_Q -[hidden]down-> UI_TASK
 SENSOR_MB -[hidden]down-> TEMP_TASK
 EEPROM_EG -[hidden]down-> SHELL_TASK
 
-CTRL_TASK -[hidden]down-> CO2_SENSOR
 UI_TASK -[hidden]down-> EEPROM
 TEMP_TASK -[hidden]down-> TEMP_SENSOR
 SHELL_TASK -[hidden]down-> UART
 
 VALVE_TIMER -[hidden]down-> VALVE_ISR
 UI_TIMER -[hidden]down-> ROT_ISR
-
-
-' ============================================================
-' startup / persistent settings
-' ============================================================
-
-STARTUP_TASK --> EEPROM : load settings
-
-NETWORK_MB ..> NETWORK_TASK : Wi-Fi credentials
 
 
 ' ============================================================
@@ -229,35 +219,33 @@ ROT_ISR ..> DISPLAY_Q : FromISR
 ' co2 valve timer / alarm chain
 ' ============================================================
 
-CTRL_TASK ..> VALVE_TIMER : start / stop
-
-VALVE_TIMER --> VALVE_ISR : HW alarm
+CTRL_TASK ..> VALVE_TIMER : start / pulse time
 
 VALVE_TIMER --> VALVE : open
+
+VALVE_TIMER --> VALVE_ISR : HW alarm +1-3 s
 
 VALVE_ISR --> VALVE : close
 
 
 ' ============================================================
-' direct hardware access
+' modbus shared access
 ' ============================================================
 
-CO2_SENSOR --> CTRL_TASK : read CO2
+CTRL_TASK --> MODBUS_CLIENT : CO2 / fan
 
-CTRL_TASK --> FAN : control
+TEMP_TASK --> MODBUS_CLIENT : temp / RH
 
-TEMP_SENSOR --> TEMP_TASK : read temp / RH
+MODBUS_CLIENT --> CO2_SENSOR : RTU
+
+MODBUS_CLIENT --> FAN : RTU
+
+MODBUS_CLIENT --> TEMP_SENSOR : RTU
 
 
 ' ============================================================
-' persistent settings / service access
+' uart access
 ' ============================================================
-
-UI_TASK <--> EEPROM : setpoint / WLAN
-
-SHELL_TASK <--> EEPROM : settings / WLAN
-
-NETWORK_TASK --> EEPROM : TalkBack setpoint
 
 SHELL_TASK <--> UART : commands / output
 
@@ -282,7 +270,6 @@ legend bottom right
   IPC boxes summarize producers / consumers
 
   8 steady-state task instances
-  + 1 transient Startup Task
   (Button Tasks = 3 instances)
 endlegend
 
