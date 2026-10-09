@@ -253,7 +253,7 @@ MODBUS_CLIENT --> TEMP_SENSOR : RTU
 ' external network access
 ' ============================================================
 
-NETWORK_TASK -up-> THINGSPEAK : HTTPS
+NETWORK_TASK <-up-> THINGSPEAK : HTTPS
 
 
 ' ============================================================
