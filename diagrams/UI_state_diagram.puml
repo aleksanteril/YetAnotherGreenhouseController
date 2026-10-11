@@ -1,0 +1,177 @@
+@startuml
+!theme reddress-lightgreen
+
+title CO2 Controller - UI State Diagram
+
+top to bottom direction
+
+skinparam shadowing false
+skinparam nodesep 40
+skinparam ranksep 60
+skinparam ArrowThickness 1
+skinparam defaultTextAlignment left
+
+skinparam state {
+    BackgroundColor #F2F2F2
+    BorderColor #777777
+    FontColor #222222
+}
+
+skinparam note {
+    BackgroundColor #FFFDEB
+    BorderColor #888888
+    FontColor #222222
+}
+
+
+' ============================================================
+' states
+' ============================================================
+
+state status
+status : Enter / xEventGroupClearBits(sw_tasks, PROCEED);\nhandle_draw_sensors(display);
+status : UPDATE / handle_draw_sensors(display);
+status : Exit / xEventGroupSetBits(sw_tasks, PROCEED);
+
+state menu
+menu : Enter / menu_i = 0;\ndisplay.text("INFO", 18, 0, 1);\ndisplay.text("SET CO2 TARGET", 18, 9, 1);\ndisplay.text("SET NETWORK", 18, 18, 1);
+menu : LEFT / handle_var(ev, menu_i, 0, items.size()-1);
+menu : RIGHT / handle_var(ev, menu_i, 0, items.size()-1);
+menu : Exit /
+
+state info
+info : Enter / display.fill(0);\nread_info_eeprom(eeprom, display);\ndisplay.show();
+info : Exit /
+
+state set_target
+set_target : Enter / menu_i = 0;\nset_val.fill(0);\ndisplay.text("SET CO2 TARGET", 9, 0, 1);\ndisplay.text("SW2 TO SAVE", 18, 54, 1);\nhandle_draw_val(display, set_val, menu_i);
+set_target : LEFT / handle_var(ev, set_val[menu_i], 0, 9);\nhandle_draw_val(display, set_val, menu_i);
+set_target : RIGHT / handle_var(ev, set_val[menu_i], 0, 9);\nhandle_draw_val(display, set_val, menu_i);
+set_target : PRESS_SW0 / menu_i = ++menu_i % set_val.size();\nhandle_draw_val(display, set_val, menu_i);
+set_target : Exit /
+
+state set_network
+set_network : Enter / menu_i = 0; ch = 'a';\n~*wlan_buf.ssid = '\\0';\ndisplay.text("SET SSID", 32, 0, 1);\nhandle_draw_selector(display, (char)ch);
+set_network : LEFT / handle_var(ev, ch, 32, 126);\nhandle_draw_selector(display, (char)ch);
+set_network : RIGHT / handle_var(ev, ch, 32, 126);\nhandle_draw_selector(display, (char)ch);
+set_network : PRESS_SW0 [menu_i < 32] / wlan_buf.ssid[menu_i] = (char)ch;\nwlan_buf.ssid[++menu_i] = '\\0';\nhandle_draw_rows(display, wlan_buf.ssid);
+set_network : PRESS_SW1 [menu_i > 0] / wlan_buf.ssid[--menu_i] = '\\0';\nhandle_draw_rows(display, wlan_buf.ssid);
+set_network : Exit /
+
+state set_password
+set_password : Enter / menu_i = 0; ch = 'a';\n~*wlan_buf.pwd = '\\0';\ndisplay.text("SET PASSWORD", 16, 0, 1);\nhandle_draw_selector(display, (char)ch);
+set_password : LEFT / handle_var(ev, ch, 32, 126);\nhandle_draw_selector(display, (char)ch);
+set_password : RIGHT / handle_var(ev, ch, 32, 126);\nhandle_draw_selector(display, (char)ch);
+set_password : PRESS_SW0 [menu_i < 63] / wlan_buf.pwd[menu_i] = (char)ch;\nwlan_buf.pwd[++menu_i] = '\\0';\nhandle_draw_rows(display, wlan_buf.pwd);
+set_password : PRESS_SW1 [menu_i > 0] / wlan_buf.pwd[--menu_i] = '\\0';\nhandle_draw_rows(display, wlan_buf.pwd);
+set_password : Exit /
+
+state wait
+wait : Enter / xTimerReset(inact_t, 0);
+wait : Exit /
+
+
+' ============================================================
+' initial state
+' ============================================================
+
+[*] -down-> menu
+
+
+' ============================================================
+' menu transitions
+' ============================================================
+
+menu -left-> info : PRESS_SW0 [menu_i == 0] /
+
+menu -down-> set_target : PRESS_SW0 [menu_i == 1] /
+
+menu -right-> set_network : PRESS_SW0 [menu_i == 2] /
+
+
+' ============================================================
+' info transition
+' ============================================================
+
+info -up-> menu : PRESS_SW0 /
+
+
+' ============================================================
+' set target transitions
+' ============================================================
+
+set_target -up-> menu : PRESS_SW2 [save OK] /
+
+set_target -down-> wait : PRESS_SW2 [invalid value] /\ndisplay.text("Invalid value!", 0, 0, 1);
+
+set_target -down-> wait : PRESS_SW2 [EEPROM save failed] /\ndisplay.text("EEPROM Save fail!", 0, 9, 1);
+
+
+' ============================================================
+' network transitions
+' ============================================================
+
+set_network --> set_password : PRESS_SW2 /
+
+set_password -[norank]----> wait : PRESS_SW2 [EEPROM save failed] /\ndisplay.text("EEPROM Save fail!", 0, 9, 1);
+
+set_password --> [*] : PRESS_SW2 [save OK] /\nwatchdog_reboot(0, 0, 1000);
+
+
+' ============================================================
+' wait transition
+' ============================================================
+
+wait --> menu : PRESS_SW0 /
+
+
+' ============================================================
+' status transitions
+' ============================================================
+
+status -right-> menu : LEFT /\nRIGHT /
+
+
+' ============================================================
+' layout
+' ============================================================
+
+status -[hidden]right-> menu
+
+info -[hidden]right-> set_target
+set_target -[hidden]right-> set_network
+
+menu -[hidden]down-> set_target
+
+set_target -[hidden]down-> wait
+set_network -[hidden]down-> set_password
+
+
+' ============================================================
+' notes
+' ============================================================
+
+note top of status
+A 15 s one-shot timer sends
+INACTIVE to Event_q.
+
+INACTIVE causes a transition
+to status from menu, info,
+set_target, set_network,
+set_password and wait.
+
+INACTIVE is ignored
+while status is active.
+
+xEventGroupClearBits(sw_tasks, PROCEED)
+blocks the button polling tasks
+while status is active.
+end note
+
+note bottom of wait
+xTimerReset(inact_t, 0)
+restarts the 15 s inactivity timer
+on active UI input.
+end note
+
+@enduml
