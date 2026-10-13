@@ -1,0 +1,195 @@
+@startuml
+!theme reddress-lightgreen
+
+title CO2 Controller - UI State Diagram
+
+top to bottom direction
+
+skinparam shadowing false
+skinparam nodesep 40
+skinparam ranksep 60
+skinparam ArrowThickness 1
+skinparam defaultTextAlignment left
+
+hide stereotype
+
+skinparam state {
+    BackgroundColor #F2F2F2
+    BorderColor #777777
+    FontColor #222222
+
+    BackgroundColor<<netlabel>> #FFFACD
+    BorderColor<<netlabel>> #888888
+    FontColor<<netlabel>> #222222
+
+    BackgroundColor<<eventheader>> #FFFACD
+    BorderColor<<eventheader>> #666666
+    FontColor<<eventheader>> #222222
+}
+
+skinparam note {
+    BackgroundColor #FFFDEB
+    BorderColor #888888
+    FontColor #222222
+}
+
+
+' ============================================================
+' states
+' ============================================================
+
+state status
+status : Enter / pause button tasks;\nshow sensor values;
+status : UPDATE / refresh sensor values;
+status : Exit / resume button tasks;
+
+state menu
+menu : Enter / show menu;
+menu : LEFT / previous menu item;
+menu : RIGHT / next menu item;
+
+state info
+info : Enter / show saved CO2 target\nand network information;
+
+state set_target
+set_target : Enter / show CO2 target editor;
+set_target : LEFT / decrease selected digit;
+set_target : RIGHT / increase selected digit;
+set_target : PRESS_SW0 / select next digit;
+
+state set_network
+set_network : Enter / show SSID editor;
+set_network : LEFT / previous character;
+set_network : RIGHT / next character;
+set_network : PRESS_SW0 [menu_i < 32] / write selected character;
+set_network : PRESS_SW1 [menu_i > 0] / delete character;
+
+state set_password
+set_password : Enter / show password editor;
+set_password : LEFT / previous character;
+set_password : RIGHT / next character;
+set_password : PRESS_SW0 [menu_i < 63] / write selected character;
+set_password : PRESS_SW1 [menu_i > 0] / delete character;
+
+state wait
+wait : Enter / wait for acknowledgement;
+
+
+' ============================================================
+' inactivity labels
+' ============================================================
+
+state "INACTIVE" as inactive_status <<eventheader>>
+
+state "INACTIVE" as inactive_menu <<netlabel>>
+state "INACTIVE" as inactive_info <<netlabel>>
+state "INACTIVE" as inactive_target <<netlabel>>
+state "INACTIVE" as inactive_network <<netlabel>>
+state "INACTIVE" as inactive_password <<netlabel>>
+state "INACTIVE" as inactive_wait <<netlabel>>
+
+inactive_status -down-> status : INACTIVE /
+
+menu -right[dotted]-> inactive_menu
+
+info -left[dotted]-> inactive_info
+
+set_target -right[dotted]-> inactive_target
+
+set_network -right[dotted]-> inactive_network
+
+set_password -right[dotted]-> inactive_password
+
+wait -left[dotted]-> inactive_wait
+
+note left of inactive_status
+15 s inactivity timeout
+end note
+
+
+' ============================================================
+' initial state
+' ============================================================
+
+[*] -down-> menu
+
+
+' ============================================================
+' menu transitions
+' ============================================================
+
+menu -left-> info : PRESS_SW0 [menu_i == 0] /
+
+menu -down-> set_target : PRESS_SW0 [menu_i == 1] /
+
+menu -right-> set_network : PRESS_SW0 [menu_i == 2] /
+
+
+' ============================================================
+' info transition
+' ============================================================
+
+info -up-> menu : PRESS_SW0 /
+
+
+' ============================================================
+' set target transitions
+' ============================================================
+
+set_target -up-> menu : PRESS_SW2 [save OK] /
+
+set_target -down-> wait : PRESS_SW2 [invalid value] /\nshow "Invalid value!"
+
+set_target -down-> wait : PRESS_SW2 [EEPROM save failed] /\nshow "EEPROM Save fail!"
+
+
+' ============================================================
+' network transitions
+' ============================================================
+
+set_network --> set_password : PRESS_SW2 /
+
+set_password -[norank]----> wait : PRESS_SW2 [EEPROM save failed] /\nshow "EEPROM Save fail!"
+
+set_password -down-> [*] : PRESS_SW2 [save OK] /\nreboot
+
+
+' ============================================================
+' wait transition
+' ============================================================
+
+wait --> menu : PRESS_SW0 /
+
+
+' ============================================================
+' status transitions
+' ============================================================
+
+status -right-> menu : LEFT /\nRIGHT /
+
+
+' ============================================================
+' layout
+' ============================================================
+
+status -[hidden]right-> menu
+
+info -[hidden]right-> set_target
+set_target -[hidden]right-> set_network
+
+status -[hidden]down-> info
+menu -[hidden]down-> set_target
+
+set_target -[hidden]down-> wait
+set_network -[hidden]down-> set_password
+
+wait -[hidden]right-> set_password
+
+legend top right
+  -->  state transition
+  ..>  INACTIVE event reference
+
+  <back:#FFFACD> INACTIVE </back> inactivity event label
+endlegend
+
+@enduml

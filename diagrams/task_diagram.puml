@@ -1,0 +1,53 @@
+@startuml
+!theme reddress-lightgreen
+title Greenhouse CO2 Controller - Task Diagram
+
+left to right direction
+
+component "Shell Task" as SHELL
+component "Network Task" as NET
+component "Sensor / I/O Task" as IO
+component "Button Tasks" as BUTTON
+component "UI Task" as UI
+component "CO2 Controller Task" as CTRL
+
+note left of SHELL
+- UART command interface
+- Read and change settings
+- Quick system configuration
+end note
+
+note left of NET
+- Wi-Fi connection
+- ThingSpeak communication
+- Remote commands
+end note
+
+note left of IO
+- Read CO2 sensor
+- Read temperature
+- Read humidity
+- Read fan feedback
+end note
+
+note left of BUTTON
+- Read push buttons
+- Detect button presses
+- Send button events to UI
+end note
+
+note left of UI
+- Handle local user interface
+- Handle menus
+- Update OLED
+- Change CO2 setpoint
+end note
+
+note left of CTRL
+- Maintain CO2 setpoint
+- Control CO2 valve
+- Control ventilation
+- Handle safety limit
+end note
+
+@enduml

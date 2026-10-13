@@ -1,0 +1,234 @@
+@startuml
+!theme reddress-lightgreen
+
+title CO2 Controller - FreeRTOS Communication diagram
+
+top to bottom direction
+
+skinparam shadowing false
+skinparam nodesep 38
+skinparam ranksep 58
+skinparam defaultTextAlignment left
+skinparam ArrowThickness 1
+skinparam RectangleRoundCorner 8
+
+skinparam rectangle {
+    BorderColor #666666
+    FontColor #222222
+    BackgroundColor #EDEDED
+
+    BackgroundColor<<task>> #DCEBFA
+    BackgroundColor<<hw>> #DFF3E3
+    BackgroundColor<<service>> #E7EFEF
+    BackgroundColor<<timer>> #FFE0B2
+    BackgroundColor<<isr>> #F8DDDD
+    BackgroundColor<<sync>> #ECE4F7
+}
+
+skinparam queue {
+    BorderColor #666666
+    FontColor #222222
+    BackgroundColor #FFF6CC
+}
+
+skinparam package {
+    BorderColor #888888
+    FontColor #222222
+    BackgroundColor #FFFFFF
+}
+
+skinparam legend {
+    BackgroundColor #FFFFFF
+    BorderColor #666666
+    FontColor #222222
+}
+
+
+' ============================================================
+' freertos timers
+' ============================================================
+
+package "FreeRTOS Timers" as TIMERS {
+
+    rectangle "UI Inactivity Timer\n\n- 15 s one-shot\n- reset by UI activity" as UI_TIMER <<timer>>
+
+}
+
+
+' ============================================================
+' freertos ipc / synchronization
+' ============================================================
+
+package "FreeRTOS IPC / Synchronization" as IPC {
+
+    queue "setpoint_mb\nqueue length 1\n\nwriter: EEPROM\nreaders: Controller, UI, Network" as SETPOINT_MB
+
+    queue "network_mb\nqueue length 1\n\nwriter: EEPROM\nreader: Network" as NETWORK_MB
+
+    rectangle "Button event group\n\ncontrolled by UI\nwaited by Button Tasks" as BUTTON_EG <<sync>>
+
+    queue "DisplayEvent_q\nFreeRTOS queue\n\nproducers: Temp/RH, Controller,\nButtons, Rotary ISR, UI timer\nconsumer: UI" as DISPLAY_Q
+
+    queue "Sensor mailboxes\n\ntemp_mb, rh_mb, co2_mb, fan_mb\nqueue length 1 each\n\nwriters: Temp/RH (temp/rh), Controller (co2/fan)\nreaders: UI (temp/rh/co2), Network (all)" as SENSOR_MB
+
+    rectangle "EEPROM event group\n\nread / write synchronization\nused internally by EEPROM" as EEPROM_EG <<sync>>
+
+    SETPOINT_MB -[hidden]right-> NETWORK_MB
+    NETWORK_MB -[hidden]right-> BUTTON_EG
+    BUTTON_EG -[hidden]right-> DISPLAY_Q
+    DISPLAY_Q -[hidden]right-> SENSOR_MB
+    SENSOR_MB -[hidden]right-> EEPROM_EG
+}
+
+
+' ============================================================
+' isrs
+' ============================================================
+
+package "ISRs" as ISRS {
+
+    rectangle "Rotary Encoder ISR" as ROT_ISR <<isr>>
+
+}
+
+
+' ============================================================
+' application tasks
+' ============================================================
+
+package "Application Tasks" as TASKS {
+
+    rectangle "Controller Task\n\n- reads CO2 and setpoint\n- P-control logic\n- determines 1-3 s valve pulse\n- controls fan" as CTRL_TASK <<task>>
+
+    rectangle "Button Tasks (3)\n\n- SW0, SW1 and SW2\n- poll push buttons\n- send UI events" as BUTTON_TASKS <<task>>
+
+    rectangle "UI Task\n\n- handles display state\n- reads sensor values / setpoint\n- changes settings" as UI_TASK <<task>>
+
+    rectangle "Temp / RH Task\n\n- reads temperature / humidity\n- publishes values every 60 s" as TEMP_TASK <<task>>
+
+    rectangle "Shell Task\n\n- UART command interface\n- reads / changes settings" as SHELL_TASK <<task>>
+
+    rectangle "Network Task\n\n- Wi-Fi / HTTPS / ThingSpeak\n- sends measurements every 30 s\n- handles TalkBack SP commands\n- uses network_mb" as NETWORK_TASK <<task>>
+
+    CTRL_TASK -[hidden]right-> BUTTON_TASKS
+    BUTTON_TASKS -[hidden]right-> UI_TASK
+    UI_TASK -[hidden]right-> TEMP_TASK
+    TEMP_TASK -[hidden]right-> SHELL_TASK
+    SHELL_TASK -[hidden]right-> NETWORK_TASK
+}
+
+' ============================================================
+' services / hardware
+' ============================================================
+
+package "Services / Hardware" as HW {
+
+    rectangle "EEPROM\nI2C0\n\npersistent setpoint / WLAN\naccessed by UI, Shell, Network" as EEPROM <<service>>
+
+}
+
+
+' ============================================================
+' package layout
+' ============================================================
+
+TIMERS -[hidden]right-> IPC
+
+TIMERS -[hidden]down-> ISRS
+IPC -[hidden]down-> TASKS
+
+
+' ============================================================
+' alignment anchors
+' ============================================================
+
+SETPOINT_MB -[hidden]down---> CTRL_TASK
+BUTTON_EG -[hidden]down---> BUTTON_TASKS
+DISPLAY_Q -[hidden]down---> UI_TASK
+SENSOR_MB -[hidden]down---> TEMP_TASK
+EEPROM_EG -[hidden]down---> SHELL_TASK
+
+UI_TIMER -[hidden]right---> ROT_ISR
+
+' ============================================================
+' eeprom paths
+' ============================================================
+
+EEPROM <...> EEPROM_EG : on write / 10ms wait sync
+
+EEPROM ..> SETPOINT_MB : CO2 SP
+
+EEPROM ..> NETWORK_MB : SSID / passwd
+
+SHELL_TASK <---> EEPROM : setpoint / wlan
+
+UI_TASK <---> EEPROM : setpoint / wlan
+
+NETWORK_TASK ---> EEPROM : setpoint
+
+' ============================================================
+' ui timer / display event path
+' ============================================================
+
+' UI_TASK ..> UI_TIMER : reset
+
+UI_TIMER ..> DISPLAY_Q : INACTIVE
+
+DISPLAY_Q ....> UI_TASK : receive
+
+
+' ============================================================
+' rotary encoder isr
+' ============================================================
+
+ROT_ISR ..> DISPLAY_Q : RIGHT / LEFT
+
+' ============================================================
+' mailbox - tasks paths
+' ============================================================
+
+BUTTON_TASKS ....> DISPLAY_Q : PUSH_SWx
+
+TEMP_TASK ....> SENSOR_MB : Temp / RH
+
+CTRL_TASK ....> SENSOR_MB : CO2 / fan
+
+SETPOINT_MB ....> CTRL_TASK : read
+
+SETPOINT_MB ....> UI_TASK : read
+
+SETPOINT_MB ....> NETWORK_TASK : read
+
+NETWORK_MB ....> NETWORK_TASK : read
+
+BUTTON_EG ....> BUTTON_TASKS : read
+
+SENSOR_MB ....> UI_TASK : read
+
+SENSOR_MB ....> NETWORK_TASK : read
+
+UI_TASK ....> BUTTON_EG : stop / go
+
+' ============================================================
+' legend
+' ============================================================
+
+legend bottom right
+  <back:#DCEBFA>   </back> task
+  <back:#E7EFEF>   </back> service
+  <back:#FFF6CC>   </back> FreeRTOS IPC
+  <back:#FFE0B2>   </back> FreeRTOS timer
+  <back:#F8DDDD>   </back> ISR
+  <back:#ECE4F7>   </back> sync / event group
+
+  <--> bidirectional service access
+  -->  direct hardware / service access
+  ..>  FreeRTOS kernel mechanism
+
+  IPC boxes summarize producers / consumers
+
+  8 steady-state task instances
+  (Button Tasks = 3 instances)
+endlegend
+
+@enduml
