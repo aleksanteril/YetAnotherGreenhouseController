@@ -6,6 +6,7 @@
 QueueHandle_t Sensors::rh_mb{ nullptr };
 QueueHandle_t Sensors::temp_mb{ nullptr };
 QueueHandle_t Sensors::co2_mb{ nullptr };
+QueueHandle_t Sensors::fan_mb{ nullptr };
 
 using namespace Sensors;
 
@@ -70,6 +71,8 @@ constexpr uint PRODUAL_ADDR{ 1 };
 PRODUAL::PRODUAL(std::shared_ptr<ModbusClient> client_)
 : counter(client_, PRODUAL_ADDR, 4, false), speed(client_, PRODUAL_ADDR, 0) 
 {
+        fan_mb = xQueueCreate(1, sizeof(SensorPacket_t));
+        vQueueAddToRegistry(fan_mb, "FAN_MB");
         set_output(0);
 }
 
@@ -103,6 +106,11 @@ PRODUAL::write_speed(uint16_t val)
         if(running) {
                 speed.write(val > 1000 ? 1000 : val);
         }
+        Sensors::SensorPacket_t packet{
+                .timestamp = xTaskGetTickCount(),
+                .f64 = read_speed()
+        };
+        xQueueOverwrite(fan_mb, (void*)&packet);
 }
 
 void
@@ -110,9 +118,6 @@ PRODUAL::set_output(int percent)
 {
         if(percent <= 0) {
                 percent = 0;
-        } else if(percent <= 20) {
-                // minimum speed to turn the fan
-                percent = 20;
         } else if(percent >= 100) {
                 percent = 100;
         }
@@ -160,9 +165,8 @@ CO2_Valve::set_output(int percent)
 {
         if(percent <= 0) {
                 xTimerStop(tmr, 0);
-                //close();
                 return;
-        } 
+        }
         if(percent <= 10) {
                 // min 1s of co2
                 percent = 10;
@@ -172,6 +176,8 @@ CO2_Valve::set_output(int percent)
         }
         open_ms = percent*100;
         if(xTimerIsTimerActive(tmr) == pdFALSE) {
+                // force first callback through here, occurs 30s -> onwards
+                valve_timer(tmr);
                 xTimerStart(tmr, 0);
         }
 }

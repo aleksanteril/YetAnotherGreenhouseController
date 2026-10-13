@@ -103,7 +103,7 @@ read_info_eeprom(EEPROM& e, ssd1306os& display)
         std::array<char, 16> setp;
         snprintf(setp.data(), setp.size(), "- %4u ppm -", setpoint);
         display.text("CO2 TARGET", 24, 0, 1);
-        display.text(setp.data(), 16, 10, 1);
+        display.text(setp.data(), 16, 12, 1);
         display.text("NETWORK SSID", 16, 28, 1);
         if(size_t len{ strlen(packet.ssid) }; len > 16) {
                 // if cut off get second row
@@ -232,7 +232,7 @@ UI_Display::set_password(enum intEvent _e)
                 ch = 'a';
                 *wlan_buf.pwd = '\0';
                 display.fill(0);
-                display.text("SET PASSWORD", 12, 0, 1);
+                display.text("SET PASSWORD", 16, 0, 1);
                 handle_draw_selector(display, (char)ch);
                 xTimerReset(inact_t, 0);
                 break;
@@ -267,8 +267,9 @@ UI_Display::set_password(enum intEvent _e)
                                 display.text("EEPROM Save fail!", 0, 9, 1);
                                 display.show();
                                 change_state_to(&UI_Display::wait);
+                        } else {
+                                watchdog_reboot(0, 0, 1000);
                         }
-                        watchdog_reboot(0, 0, 1000);
                         break;
                 case INACTIVE:
                         change_state_to(&UI_Display::status);
@@ -287,7 +288,7 @@ UI_Display::set_network(enum intEvent _e)
                 ch = 'a';
                 *wlan_buf.ssid = '\0';
                 display.fill(0);
-                display.text("SET SSID", 28, 0, 1);
+                display.text("SET SSID", 32, 0, 1);
                 handle_draw_selector(display, (char)ch);
                 xTimerReset(inact_t, 0);
                 break;
@@ -457,6 +458,7 @@ UI_Display::status(enum intEvent _e)
                 } else if(ev != INACTIVE) {
                         change_state_to(&UI_Display::menu);
                 }
+                break;
         case Exit:
                 // button tasks continue
                 xEventGroupSetBits(sw_tasks, PROCEED);

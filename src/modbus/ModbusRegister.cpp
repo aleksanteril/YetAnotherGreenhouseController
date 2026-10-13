@@ -2,9 +2,9 @@
 // Created by Keijo Länsikunnas on 14.2.2024.
 //
 
-#include <mutex>
-
 #include "ModbusRegister.h"
+
+#include <mutex>
 
 ModbusRegister::ModbusRegister(std::shared_ptr<ModbusClient> client_, int server_address, int register_address,
                                bool holding_register) :

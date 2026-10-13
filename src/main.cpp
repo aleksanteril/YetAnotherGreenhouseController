@@ -46,7 +46,7 @@ startup_task(void* param)
         xTaskCreate(shell_task, "SHELL",
                 392, (void*)&e, tskIDLE_PRIORITY + 1, nullptr);
         xTaskCreate(ui_task, "UI", 
-                320, (void*)&e, tskIDLE_PRIORITY + 1, nullptr);
+                392, (void*)&e, tskIDLE_PRIORITY + 1, nullptr);
         xTaskCreate(controller_task, "CONTROLLER", 
                 256, nullptr, tskIDLE_PRIORITY + 2, nullptr);
         xTaskCreate(network_task, "NETWORK",
@@ -95,7 +95,7 @@ controller_task(void* param)
 {
         auto uart_ptr{ std::make_shared<PicoOsUart>(1, 
                 UART1_TX_PIN, UART1_RX_PIN, UART1_BAUD, 2) };
-        auto rtu{std::make_shared<ModbusClient>(uart_ptr)};
+        auto rtu{ std::make_shared<ModbusClient>(uart_ptr) };
         // spin-off temp and rh measuring to another task
         // as this needs to be run much less frequently
         xTaskCreate(temp_rh_task, "TEMP & RH", 
@@ -106,9 +106,9 @@ controller_task(void* param)
         CO2_Valve valve;
 
         int sp{};
-        P_Controller pid_valve(valve, sp, 0.05);
+        P_Controller pid_valve(valve, sp, 0.08);
         bool fan_enable{};
-        P_Controller pid_fan(fan, sp, 2, false);
+        P_Controller pid_fan(fan, sp, 0.3, false);
         Display::Event updt{ Display::UPDATE };
         for(;;) {
                 vTaskDelay(pdMS_TO_TICKS(2000));
@@ -181,8 +181,9 @@ void network_task(void *param)
                 data.temperature = packet.f64;
                 xQueuePeek(Sensors::rh_mb, &packet, 0);
                 data.humidity = packet.f64;
+                xQueuePeek(Sensors::fan_mb, &packet, 0);
+                data.fan_percent = packet.f64;
                 xQueuePeek(Cache::setpoint_mb, &data.setpoint_ppm, 0);
-                data.fan_percent = 0; // right now unused
 
                 // Push measurements to the cloud.
                 // get talkback command if any at the same time
