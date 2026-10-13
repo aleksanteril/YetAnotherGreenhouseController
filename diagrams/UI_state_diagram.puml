@@ -22,7 +22,7 @@ skinparam state {
     BorderColor<<netlabel>> #888888
     FontColor<<netlabel>> #222222
 
-    BackgroundColor<<eventheader>> #FFE9A8
+    BackgroundColor<<eventheader>> #FFFACD
     BorderColor<<eventheader>> #666666
     FontColor<<eventheader>> #222222
 }
@@ -81,26 +81,26 @@ wait : Enter / wait for acknowledgement;
 
 state "INACTIVE" as inactive_status <<eventheader>>
 
-state "> INACTIVE" as inactive_menu <<netlabel>>
-state "< INACTIVE" as inactive_info <<netlabel>>
-state "> INACTIVE" as inactive_target <<netlabel>>
-state "> INACTIVE" as inactive_network <<netlabel>>
-state "> INACTIVE" as inactive_password <<netlabel>>
-state "< INACTIVE" as inactive_wait <<netlabel>>
+state "INACTIVE" as inactive_menu <<netlabel>>
+state "INACTIVE" as inactive_info <<netlabel>>
+state "INACTIVE" as inactive_target <<netlabel>>
+state "INACTIVE" as inactive_network <<netlabel>>
+state "INACTIVE" as inactive_password <<netlabel>>
+state "INACTIVE" as inactive_wait <<netlabel>>
 
 inactive_status -down-> status : INACTIVE /
 
-menu -right-> inactive_menu
+menu -right[dotted]-> inactive_menu
 
-info -left-> inactive_info
+info -left[dotted]-> inactive_info
 
-set_target -right-> inactive_target
+set_target -right[dotted]-> inactive_target
 
-set_network -right-> inactive_network
+set_network -right[dotted]-> inactive_network
 
-set_password -right-> inactive_password
+set_password -right[dotted]-> inactive_password
 
-wait -left> inactive_wait
+wait -left[dotted]-> inactive_wait
 
 note left of inactive_status
 15 s inactivity timeout
@@ -184,5 +184,12 @@ set_target -[hidden]down-> wait
 set_network -[hidden]down-> set_password
 
 wait -[hidden]right-> set_password
+
+legend top right
+  -->  state transition
+  ..>  INACTIVE event reference
+
+  <back:#FFFACD> INACTIVE </back> inactivity event label
+endlegend
 
 @enduml
